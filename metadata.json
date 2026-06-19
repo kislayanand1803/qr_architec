@@ -1,0 +1,6 @@
+{
+  "name": "QR Architect",
+  "description": "A modern QR code builder and real-time management dashboard",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
