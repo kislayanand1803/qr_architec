@@ -54,6 +54,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import android.content.ContentValues
+import android.provider.MediaStore
+import android.os.Environment
+import android.os.Build
+import android.net.Uri
+import java.io.OutputStream
+import java.io.File
+import java.io.FileOutputStream
 
 // Bento Grid Design Theme Colors (Elegant Dark Theme)
 val SlateDark = Color(0xFF0F0D15)     // #0F0D15 - Deep dark space background
@@ -61,6 +69,72 @@ val SlateCard = Color(0xFF1D1A22)     // #1D1A22 - Soft elevated card background
 val SlateBorder = Color(0xFF2E2B35)   // #2E2B35 - Dark contrast border
 val EmeraldPrime = Color(0xFFD0BCFF)  // #D0BCFF - Vibrant M3 lavender highlight
 val IndigoAccent = Color(0xFFF3EDF7)  // #F3EDF7 - Radiant purple-white for prominent text
+
+fun saveBitmapToGallery(context: Context, bitmap: Bitmap, title: String): Uri? {
+    val resolver = context.contentResolver
+    val cleanTitle = title.trim().replace(Regex("[^a-zA-Z0-9_]"), "_").ifBlank { "QR_Code" }
+    val filename = "${cleanTitle}_${System.currentTimeMillis()}.png"
+    
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/QR_Generator")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+    }
+    
+    var imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+    
+    if (imageUri == null) {
+        try {
+            val directory = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: context.filesDir
+            val fallbackFile = File(directory, filename)
+            FileOutputStream(fallbackFile).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            return Uri.fromFile(fallbackFile)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
+    
+    try {
+        resolver.openOutputStream(imageUri).use { outputStream ->
+            if (outputStream != null) {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+            } else {
+                throw java.io.IOException("Failed to get output stream.")
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            contentValues.clear()
+            contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            resolver.update(imageUri, contentValues, null, null)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        try {
+            resolver.delete(imageUri, null, null)
+        } catch (delEx: Exception) {
+            // ignore
+        }
+        
+        try {
+            val directory = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: context.filesDir
+            val fallbackFile = File(directory, filename)
+            FileOutputStream(fallbackFile).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            return Uri.fromFile(fallbackFile)
+        } catch (e2: Exception) {
+            e2.printStackTrace()
+            return null
+        }
+    }
+    return imageUri
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -324,6 +398,10 @@ fun LibraryWorkspace(
     // Collect specific tags to populate tags filter list
     val availableTags = qrList.mapNotNull { it.tag }.distinct()
 
+    LaunchedEffect(viewModel.searchQuery, viewModel.selectedTypeFilter, viewModel.selectedTagFilter, viewModel.selectedSortOrder) {
+        viewModel.triggerLibraryRefresh()
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Search & Filters Panel
         Card(
@@ -539,8 +617,22 @@ fun LibraryWorkspace(
             }
         }
 
-        // Empty Library check
-        if (filteredList.isEmpty()) {
+        val slateShimmerBrush = shimmerBrush()
+
+        // Empty/Loading Library check
+        if (viewModel.isLibraryLoading) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 160.dp),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(6) {
+                    QrCodeSkeletonCard(shimmerBrush = slateShimmerBrush)
+                }
+            }
+        } else if (filteredList.isEmpty()) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -744,6 +836,117 @@ fun QrCodeCatalogCard(
     }
 }
 
+@Composable
+fun shimmerBrush(
+    showShimmer: Boolean = true,
+    targetValue: Float = 1000f
+): Brush {
+    return if (showShimmer) {
+        val transition = rememberInfiniteTransition(label = "shimmer")
+        val translateAnimation by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = targetValue,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "shimmer_animation"
+        )
+        val shimmerColors = listOf(
+            Color(0xFF161421),
+            Color(0xFF2E2B3D),
+            Color(0xFF161421)
+        )
+        Brush.linearGradient(
+            colors = shimmerColors,
+            start = Offset(translateAnimation - 350f, translateAnimation - 350f),
+            end = Offset(translateAnimation, translateAnimation)
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(Color.Transparent, Color.Transparent)
+        )
+    }
+}
+
+@Composable
+fun QrCodeSkeletonCard(shimmerBrush: Brush) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("qr_skeleton_card"),
+        colors = CardDefaults.cardColors(containerColor = SlateCard),
+        border = BorderStroke(1.dp, SlateBorder),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(shimmerBrush)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 54.dp, height = 18.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(shimmerBrush)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(110.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(shimmerBrush)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(shimmerBrush)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(45.dp)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerBrush)
+                )
+                Box(
+                    modifier = Modifier
+                        .width(50.dp)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerBrush)
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .width(60.dp)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(shimmerBrush)
+            )
+        }
+    }
+}
+
 // CREATOR WORKSPACE (QR Code customization portal)
 @Composable
 fun CreatorWorkshopWorkspace(
@@ -751,12 +954,34 @@ fun CreatorWorkshopWorkspace(
     onSaveClicked: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var isSimulatingLaser by remember { mutableStateOf(false) }
     var scanSimulationMsg by remember { mutableStateOf<String?>(null) }
     var laserProgress by remember { mutableStateOf(0f) }
 
+    // Simulates an asynchronous compilation shimmer effect on live content refresh
+    var isPreviewLoading by remember { mutableStateOf(false) }
+    val slateShimmerBrush = shimmerBrush()
+
+    LaunchedEffect(
+        viewModel.creatorTitle, viewModel.creatorContent, viewModel.creatorType,
+        viewModel.creatorFgColor, viewModel.creatorBgColor, viewModel.creatorIsGradient,
+        viewModel.creatorGradientColor2, viewModel.creatorGradientType, viewModel.creatorTransparentBg,
+        viewModel.creatorModuleShape, viewModel.creatorEyeStyle, viewModel.creatorLogoAsset,
+        viewModel.creatorLogoScale, viewModel.creatorLogoPadding, viewModel.creatorFrameText,
+        viewModel.creatorFrameStyle, viewModel.creatorErrorLevel, viewModel.creatorIsDynamic,
+        viewModel.creatorRedirectUrl, viewModel.creatorUtmSource, viewModel.creatorUtmMedium,
+        viewModel.creatorUtmCampaign, viewModel.wifiSsid, viewModel.wifiPassword,
+        viewModel.wifiEncryption, viewModel.contactName, viewModel.contactPhone,
+        viewModel.contactEmail, viewModel.contactOrg
+    ) {
+        isPreviewLoading = true
+        delay(400) // perceived performance delay simulation
+        isPreviewLoading = false
+    }
+
     // Recompiles the live WYSIWYG generator preview output reactively!
-    val previewBitmap = remember(
+    val previewAndroidBitmap = remember(
         viewModel.creatorTitle, viewModel.creatorContent, viewModel.creatorType,
         viewModel.creatorFgColor, viewModel.creatorBgColor, viewModel.creatorIsGradient,
         viewModel.creatorGradientColor2, viewModel.creatorGradientType, viewModel.creatorTransparentBg,
@@ -792,15 +1017,232 @@ fun CreatorWorkshopWorkspace(
             utmMedium = viewModel.creatorUtmMedium.ifBlank { null },
             utmCampaign = viewModel.creatorUtmCampaign.ifBlank { null }
         )
-        QrGenerator.generateQrBitmap(dummyCode, 480).asImageBitmap()
+        QrGenerator.generateQrBitmap(dummyCode, 480)
     }
 
-    Row(modifier = Modifier.fillMaxSize().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Left Column: Customizer inputs
+    val previewBitmap = remember(previewAndroidBitmap) {
+        previewAndroidBitmap.asImageBitmap()
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        // ---------------- STICKY PREVIEW & ACTION PANEL ----------------
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SlateCard),
+            border = BorderStroke(1.dp, SlateBorder),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left: The WYSIWYG QR Preview Panel
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "LIVE PREVIEW",
+                            style = MaterialTheme.typography.labelSmall.copy(color = EmeraldPrime, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = viewModel.creatorTitle.ifBlank { "Untitled QR" },
+                            style = MaterialTheme.typography.titleSmall.copy(color = Color.White, fontWeight = FontWeight.Bold),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // QR DISPLAY BOX
+                        Box(
+                            modifier = Modifier
+                                .size(130.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .let { baseMod ->
+                                    if (isPreviewLoading) {
+                                        baseMod.background(slateShimmerBrush)
+                                    } else if (viewModel.creatorTransparentBg) {
+                                        baseMod.background(Brush.linearGradient(listOf(Color.White, Color.LightGray)))
+                                    } else {
+                                        baseMod.background(Color(viewModel.creatorBgColor))
+                                    }
+                                }
+                                .padding(6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isPreviewLoading) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(slateShimmerBrush)
+                                )
+                            } else {
+                                Image(
+                                    bitmap = previewBitmap,
+                                    contentDescription = "Live generated preview",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+
+                                // Real-time Glowing Laser Sweep Animation simulation
+                                if (isSimulatingLaser) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(laserProgress)
+                                            .drawBehind {
+                                                drawLine(
+                                                    color = EmeraldPrime,
+                                                    start = Offset(0f, size.height),
+                                                    end = Offset(size.width, size.height),
+                                                    strokeWidth = 3.dp.toPx()
+                                                )
+                                            }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Right: Primary Action Buttons Column
+                    Column(
+                        modifier = Modifier.weight(1.1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // SAVE DESIGN TO LIBRARY
+                        Button(
+                            onClick = onSaveClicked,
+                            colors = ButtonDefaults.buttonColors(containerColor = IndigoAccent, contentColor = SlateDark),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .testTag("save_design_button"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.CloudUpload, contentDescription = "Commit to local database", tint = SlateDark, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("SAVE DESIGN", color = SlateDark, fontWeight = FontWeight.Black, fontSize = 10.sp)
+                        }
+
+                        // DOWNLOAD PNG FILE
+                        Button(
+                            onClick = {
+                                val savedUri = saveBitmapToGallery(context, previewAndroidBitmap, viewModel.creatorTitle)
+                                if (savedUri != null) {
+                                    if (savedUri.scheme == "file") {
+                                        Toast.makeText(context, "PNG saved: ${savedUri.path}", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        Toast.makeText(context, "PNG saved to Pictures/QR_Generator gallery!", Toast.LENGTH_LONG).show()
+                                    }
+                                } else {
+                                    Toast.makeText(context, "Failed to save QR code PNG.", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = EmeraldPrime,
+                                contentColor = SlateDark
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .testTag("download_png_button"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Download custom QR PNG icon",
+                                tint = SlateDark,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "DOWNLOAD PNG",
+                                fontWeight = FontWeight.Bold,
+                                color = SlateDark,
+                                fontSize = 10.sp
+                            )
+                        }
+
+                        // TEST SCAN RELIABILITY
+                        Button(
+                            onClick = {
+                                if (!isSimulatingLaser) {
+                                    isSimulatingLaser = true
+                                    laserProgress = 0f
+                                    scanSimulationMsg = null
+                                    scope.launch {
+                                        animate(0f, 1f, animationSpec = tween(1200, easing = LinearEasing)) { v, _ ->
+                                            laserProgress = v
+                                        }
+                                        delay(200)
+                                        isSimulatingLaser = false
+                                        val (msg, ok) = viewModel.calculateContrastSafety()
+                                        scanSimulationMsg = msg
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSimulatingLaser) Color.DarkGray else EmeraldPrime
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .testTag("test_scan_button"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterCenterFocus,
+                                contentDescription = "Test scan icon",
+                                tint = SlateDark,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isSimulatingLaser) "SCANNING..." else "TEST SCAN",
+                                fontWeight = FontWeight.Bold,
+                                color = SlateDark,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+
+                // Diagnostics panel below Row, but inside the Sticky Card block
+                scanSimulationMsg?.let { msg ->
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val isWarning = msg.contains("WARNING") || msg.contains("CAUTION")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isWarning) Color(0x3DFBBF24) else Color(0x3D10B981))
+                            .border(1.dp, if (isWarning) Color.Yellow else EmeraldPrime, RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = if (isWarning) Color.Yellow else Color.White,
+                                lineHeight = 15.sp
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // ---------------- SCROLLABLE CONFIGURATION CONTROLS ----------------
         Column(
             modifier = Modifier
-                .weight(1.1f)
-                .fillMaxHeight()
+                .fillMaxWidth()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
             // General Info Header
@@ -1379,162 +1821,6 @@ fun CreatorWorkshopWorkspace(
             }
             
             Spacer(modifier = Modifier.height(48.dp))
-        }
-
-        // Right Column: Live WYSIWYG WYSIWYG screen preview & diagnostics scanner
-        Column(
-            modifier = Modifier
-                .weight(0.9f)
-                .fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "LIVE WYSIWYG WORKBENCH",
-                        style = MaterialTheme.typography.labelSmall.copy(color = EmeraldPrime, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = viewModel.creatorTitle,
-                        style = MaterialTheme.typography.titleMedium.copy(color = Color.White, fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // QR DISPLAY BOX
-                    Box(
-                        modifier = Modifier
-                            .size(240.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .let { baseMod ->
-                                if (viewModel.creatorTransparentBg) {
-                                    baseMod.background(Brush.linearGradient(listOf(Color.White, Color.LightGray)))
-                                } else {
-                                    baseMod.background(Color(viewModel.creatorBgColor))
-                                }
-                            }
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            bitmap = previewBitmap,
-                            contentDescription = "Live generated preview",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-
-                        // Real-time Glowing Laser Sweep Animation simulation
-                        if (isSimulatingLaser) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight(laserProgress)
-                                    .drawBehind {
-                                        drawLine(
-                                            color = EmeraldPrime,
-                                            start = Offset(0f, size.height),
-                                            end = Offset(size.width, size.height),
-                                            strokeWidth = 4.dp.toPx()
-                                        )
-                                    }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Test decodability trigger
-                    Button(
-                        onClick = {
-                            if (!isSimulatingLaser) {
-                                isSimulatingLaser = true
-                                laserProgress = 0f
-                                scanSimulationMsg = null
-                                scope.launch {
-                                    // Sweep laser down and up
-                                    animate(0f, 1f, animationSpec = tween(1200, easing = LinearEasing)) { v, _ ->
-                                        laserProgress = v
-                                    }
-                                    delay(200)
-                                    isSimulatingLaser = false
-                                    // Set assessment messages
-                                    val (msg, ok) = viewModel.calculateContrastSafety()
-                                    scanSimulationMsg = msg
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isSimulatingLaser) Color.DarkGray else EmeraldPrime
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .testTag("test_scan_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FilterCenterFocus,
-                            contentDescription = "Test scan icon"
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isSimulatingLaser) "SCAN SCANNING..." else "TEST SCAN RELIABILITY",
-                            fontWeight = FontWeight.Bold,
-                            color = SlateDark
-                        )
-                    }
-
-                    // Assessment message panel
-                    scanSimulationMsg?.let { msg ->
-                        Spacer(modifier = Modifier.height(12.dp))
-                        val isWarning = msg.contains("WARNING") || msg.contains("CAUTION")
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isWarning) Color(0x3DFBBF24) else Color(0x3D10B981))
-                                .border(1.dp, if (isWarning) Color.Yellow else EmeraldPrime, RoundedCornerShape(8.dp))
-                                .padding(8.dp)
-                        ) {
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = if (isWarning) Color.Yellow else Color.White,
-                                    lineHeight = 16.sp
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Save Floating Button
-            Button(
-                onClick = onSaveClicked,
-                colors = ButtonDefaults.buttonColors(containerColor = IndigoAccent, contentColor = SlateDark),
-                modifier = Modifier
-                    .fillPadding()
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("save_design_button"),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Icon(Icons.Default.CloudUpload, contentDescription = "Commit to local database", tint = SlateDark)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("SAVE DESIGN TO LIBRARY", color = SlateDark, fontWeight = FontWeight.Black, fontSize = 13.sp)
-            }
         }
     }
 }
@@ -2336,7 +2622,10 @@ fun DetailActionsSidebar(
             Spacer(modifier = Modifier.height(6.dp))
 
             Button(
-                onClick = { viewModel.loadForEditing(qr) },
+                onClick = {
+                    viewModel.loadForEditing(qr)
+                    onDismiss()
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = SlateDark),
                 border = BorderStroke(1.dp, SlateBorder),
                 modifier = Modifier.fillMaxWidth().height(40.dp).testTag("edit_load_button")
@@ -2349,7 +2638,10 @@ fun DetailActionsSidebar(
             Spacer(modifier = Modifier.height(6.dp))
 
             Button(
-                onClick = { viewModel.deleteQr(qr) },
+                onClick = {
+                    viewModel.deleteQr(qr)
+                    onDismiss()
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0x27EF4444)),
                 border = BorderStroke(1.dp, Color.Red),
                 modifier = Modifier.fillMaxWidth().height(40.dp).testTag("delete_button")

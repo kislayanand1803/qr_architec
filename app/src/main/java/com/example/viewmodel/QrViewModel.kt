@@ -26,6 +26,25 @@ class QrViewModel(application: Application) : AndroidViewModel(application) {
         currentTab = tab
     }
 
+    var isLibraryLoading by mutableStateOf(true)
+        private set
+
+    init {
+        viewModelScope.launch {
+            // Simulate initial list loading for skeleton loading showcase
+            kotlinx.coroutines.delay(1200)
+            isLibraryLoading = false
+        }
+    }
+
+    fun triggerLibraryRefresh() {
+        viewModelScope.launch {
+            isLibraryLoading = true
+            kotlinx.coroutines.delay(650)
+            isLibraryLoading = false
+        }
+    }
+
     // List of QR codes and scan logs
     val qrCodesState: StateFlow<List<QrCode>> = repository.allQrCodes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
