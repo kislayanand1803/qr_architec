@@ -26,6 +26,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -33,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -64,11 +67,11 @@ import java.io.File
 import java.io.FileOutputStream
 
 // Bento Grid Design Theme Colors (Elegant Dark Theme)
-val SlateDark = Color(0xFF0F0D15)     // #0F0D15 - Deep dark space background
-val SlateCard = Color(0xFF1D1A22)     // #1D1A22 - Soft elevated card background
-val SlateBorder = Color(0xFF2E2B35)   // #2E2B35 - Dark contrast border
-val EmeraldPrime = Color(0xFFD0BCFF)  // #D0BCFF - Vibrant M3 lavender highlight
-val IndigoAccent = Color(0xFFF3EDF7)  // #F3EDF7 - Radiant purple-white for prominent text
+val SlateDark = Color(0xFF08080D)     // #08080D - Deep dark space background
+val SlateCard = Color(0xFF11111B)     // #11111B - Soft elevated card background
+val SlateBorder = Color(0x0DFFFFFF)   // #0DFFFFFF (rgba 255,255,255,0.05) - Subtle contrast border
+val EmeraldPrime = Color(0xFFD8B4FE)  // #D8B4FE - Vibrant Light Purple (Accent)
+val IndigoAccent = Color(0xFFE9D5FF)  // #E9D5FF - Soft bright purple for labels
 
 fun saveBitmapToGallery(context: Context, bitmap: Bitmap, title: String): Uri? {
     val resolver = context.contentResolver
@@ -256,42 +259,44 @@ fun BrandedHeader(onResetDemo: () -> Unit, showWalkthroughHelp: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(horizontal = 6.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.linearGradient(listOf(EmeraldPrime, IndigoAccent))),
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Brush.linearGradient(listOf(EmeraldPrime, Color(0xFFC084FC)))),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.QrCodeScanner,
                     contentDescription = "QR Architect Logo",
-                    tint = Color.White,
+                    tint = SlateDark,
                     modifier = Modifier.size(24.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp)) // Increased spacing
             Column {
                 Text(
                     text = "QR Architect",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        color = IndigoAccent,
-                        letterSpacing = 0.5.sp
+                        fontWeight = FontWeight.ExtraBold, // Larger and bolder
+                        fontSize = 26.sp,
+                        color = Color.White,
+                        letterSpacing = (-0.5).sp
                     )
                 )
                 Text(
                     text = "Manage your dynamic codes",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        color = Color(0xFFCAC4D0),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color.Gray, // Smaller and gray
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.2.sp
+                        letterSpacing = 0.1.sp
                     )
                 )
             }
@@ -302,7 +307,8 @@ fun BrandedHeader(onResetDemo: () -> Unit, showWalkthroughHelp: () -> Unit) {
                 onClick = showWalkthroughHelp,
                 modifier = Modifier
                     .size(36.dp)
-                    .background(SlateCard, RoundedCornerShape(8.dp))
+                    .background(SlateCard, CircleShape) // Rounded icon button
+                    .border(BorderStroke(1.dp, SlateBorder), CircleShape)
                     .testTag("help_button")
             ) {
                 Icon(
@@ -403,109 +409,129 @@ fun LibraryWorkspace(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Search & Filters Panel
+        // Group 1: Standalone clean search card
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            shape = RoundedCornerShape(24.dp),
+                .padding(vertical = 6.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = SlateCard),
             border = BorderStroke(1.dp, SlateBorder)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // Search Input Field
-                OutlinedTextField(
-                    value = viewModel.searchQuery,
-                    onValueChange = { viewModel.searchQuery = it },
-                    placeholder = { Text("Search QR codes by title or destination...", color = Color(0xFF938F99)) },
-                    singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search icon", tint = Color(0xFF938F99)) },
-                    trailingIcon = {
-                        if (viewModel.searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Color(0xFF938F99))
-                            }
+            OutlinedTextField(
+                value = viewModel.searchQuery,
+                onValueChange = { viewModel.searchQuery = it },
+                placeholder = { Text("Search QR codes by title or destination...", color = Color(0xFF938F99), fontSize = 13.sp) },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search icon", tint = Color(0xFF938F99), modifier = Modifier.size(20.dp)) },
+                trailingIcon = {
+                    if (viewModel.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Color(0xFF938F99), modifier = Modifier.size(20.dp))
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                        .testTag("search_field"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = IndigoAccent,
-                        unfocusedTextColor = IndigoAccent,
-                        focusedBorderColor = EmeraldPrime,
-                        unfocusedBorderColor = SlateBorder,
-                        focusedContainerColor = SlateDark,
-                        unfocusedContainerColor = SlateDark
-                    ),
-                    shape = RoundedCornerShape(16.dp)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .testTag("search_field"),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Group 2: Categories Filter Section
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "ENCODING TYPE",
+                style = MaterialTheme.typography.labelSmall.copy(color = Color.Gray, fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val filterTypes = listOf("ALL", "URL", "WIFI", "VCARD", "TEXT")
+                filterTypes.forEach { type ->
+                    val isSelected = (type == "ALL" && viewModel.selectedTypeFilter.isEmpty()) || (type == viewModel.selectedTypeFilter)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.selectedTypeFilter = if (type == "ALL") "" else type },
+                        label = { Text(type, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = EmeraldPrime,
+                            selectedLabelColor = SlateDark,
+                            containerColor = SlateCard,
+                            labelColor = Color(0xFFCAC4D0)
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, borderColor = SlateBorder, selectedBorderColor = EmeraldPrime)
+                    )
+                }
+            }
+        }
+
+        if (availableTags.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Group 3: Campaigns & Tags Section
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "CAMPAIGNS & TAGS",
+                    style = MaterialTheme.typography.labelSmall.copy(color = Color.Gray, fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+                    modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Content Filter Category Chips Row
                 Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val filterTypes = listOf("ALL", "URL", "WIFI", "VCARD", "TEXT")
-                    filterTypes.forEach { type ->
-                        val isSelected = (type == "ALL" && viewModel.selectedTypeFilter.isEmpty()) || (type == viewModel.selectedTypeFilter)
+                    val isAllTagsSelected = viewModel.selectedTagFilter.isEmpty()
+                    FilterChip(
+                        selected = isAllTagsSelected,
+                        onClick = { viewModel.selectedTagFilter = "" },
+                        label = { Text("ALL TAGS", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = EmeraldPrime,
+                            selectedLabelColor = SlateDark,
+                            containerColor = SlateCard,
+                            labelColor = Color(0xFFCAC4D0)
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isAllTagsSelected, borderColor = SlateBorder, selectedBorderColor = EmeraldPrime)
+                    )
+                    availableTags.forEach { tag ->
+                        val isSelected = viewModel.selectedTagFilter == tag
                         FilterChip(
                             selected = isSelected,
-                            onClick = { viewModel.selectedTypeFilter = if (type == "ALL") "" else type },
-                            label = { Text(type, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            onClick = { viewModel.selectedTagFilter = tag },
+                            label = { Text(tag.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = EmeraldPrime,
                                 selectedLabelColor = SlateDark,
-                                containerColor = SlateDark,
+                                containerColor = SlateCard,
                                 labelColor = Color(0xFFCAC4D0)
                             ),
                             border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, borderColor = SlateBorder, selectedBorderColor = EmeraldPrime)
                         )
                     }
                 }
-
-                if (availableTags.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Tag filter chips
-                        val isAllTagsSelected = viewModel.selectedTagFilter.isEmpty()
-                        FilterChip(
-                            selected = isAllTagsSelected,
-                            onClick = { viewModel.selectedTagFilter = "" },
-                            label = { Text("ALL TAGS", fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = IndigoAccent,
-                                selectedLabelColor = SlateDark,
-                                containerColor = SlateDark,
-                                labelColor = Color(0xFFCAC4D0)
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isAllTagsSelected, borderColor = SlateBorder, selectedBorderColor = IndigoAccent)
-                        )
-                        availableTags.forEach { tag ->
-                            val isSelected = viewModel.selectedTagFilter == tag
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.selectedTagFilter = tag },
-                                label = { Text(tag, fontSize = 11.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = IndigoAccent,
-                                    selectedLabelColor = SlateDark,
-                                    containerColor = SlateDark,
-                                    labelColor = Color(0xFFCAC4D0)
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, borderColor = SlateBorder, selectedBorderColor = IndigoAccent)
-                            )
-                        }
-                    }
-                }
             }
         }
+        
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Bulk Actions Bar (displayed only when items are checked)
         val selectedCount = viewModel.selectedQrIds.filter { it.value }.size
@@ -585,34 +611,72 @@ fun LibraryWorkspace(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "${filteredList.size} codes located in system",
-                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFCAC4D0))
-            )
+            // Smaller Informational Card showing active code count with light indicator dot
+            Card(
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(EmeraldPrime, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "${filteredList.size} codes active",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    )
+                }
+            }
 
             // Sorting order pill
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
-                viewModel.selectedSortOrder = when (viewModel.selectedSortOrder) {
-                    "DATE_DESC" -> "DATE_ASC"
-                    "DATE_ASC" -> "TITLE_ASC"
-                    "TITLE_ASC" -> "SCANS_DESC"
-                    else -> "DATE_DESC"
-                }
-            }) {
-                Icon(Icons.Default.Sort, contentDescription = "Sort Icon", tint = EmeraldPrime, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clickable {
+                        viewModel.selectedSortOrder = when (viewModel.selectedSortOrder) {
+                            "DATE_DESC" -> "DATE_ASC"
+                            "DATE_ASC" -> "TITLE_ASC"
+                            "TITLE_ASC" -> "SCANS_DESC"
+                            else -> "DATE_DESC"
+                        }
+                    }
+                    .background(SlateCard, RoundedCornerShape(10.dp))
+                    .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Sort,
+                    contentDescription = "Sort Icon",
+                    tint = EmeraldPrime,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = when (viewModel.selectedSortOrder) {
-                        "DATE_ASC" -> "Date (OldestFirst)"
-                        "TITLE_ASC" -> "Alphabetical A-Z"
-                        "SCANS_DESC" -> "Scanner Count"
-                        else -> "Date (NewestFirst)"
+                        "DATE_ASC" -> "Date (Oldest)"
+                        "TITLE_ASC" -> "A - Z Alphabet"
+                        "SCANS_DESC" -> "Popularity"
+                        else -> "Date (Newest)"
                     },
-                    style = MaterialTheme.typography.labelSmall.copy(color = IndigoAccent, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = IndigoAccent,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
                 )
             }
         }
@@ -1832,6 +1896,7 @@ fun CampaignAnalyticsWorkspace(
     scanLogs: List<ScanLog>,
     viewModel: QrViewModel
 ) {
+    val context = LocalContext.current
     var selectedCampaignFilter by remember { mutableStateOf("ALL") }
     val uniqueTags = remember(qrList) {
         listOf("ALL") + qrList.mapNotNull { it.tag }.distinct()
@@ -1846,230 +1911,365 @@ fun CampaignAnalyticsWorkspace(
         scanLogs.filter { it.qrId in activeQrIds }
     }
 
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+    // Chart Time period filter (7 Days, 30 Days, 90 Days)
+    var chartRangeFilter by remember { mutableStateOf("7D") }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Dropdown campaign filters
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Analytics & Reports Library",
-                    style = MaterialTheme.typography.titleMedium.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                    text = "Analytics Overview",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
                 )
 
-                // Campaign selection dropdown row
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Campaign: ", color = Color.Gray, fontSize = 11.sp)
+                // Campaign selection dropdown raw
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Campaign: ", color = Color.Gray, fontSize = 12.sp)
                     Box(modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(SlateCard)
+                        .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(8.dp))
                         .clickable {
                             // Cycle through campaigns
                             val idx = uniqueTags.indexOf(selectedCampaignFilter)
                             val nextIdx = (idx + 1) % uniqueTags.size
                             selectedCampaignFilter = uniqueTags[nextIdx]
                         }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Text(selectedCampaignFilter.uppercase(), color = EmeraldPrime, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = selectedCampaignFilter.uppercase(),
+                                color = EmeraldPrime,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Change Campaign",
+                                tint = EmeraldPrime,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Aggregate stats cards row
+        // 1. TOP KPI CARDS
         item {
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 AnalyticsStatCard(
                     title = "Total Scans",
                     valStr = "${activeList.sumOf { it.scanCount }}",
                     sub = "All active codes",
-                    color = EmeraldPrime,
+                    color = EmeraldPrime, // Color accent only for important metrics
                     modifier = Modifier.weight(1f)
                 )
                 AnalyticsStatCard(
                     title = "Tracking Designs",
                     valStr = "${activeList.size}",
-                    sub = "Stored locally",
-                    color = IndigoAccent,
+                    sub = "Stored insights",
+                    color = Color.White,
                     modifier = Modifier.weight(1f)
                 )
                 AnalyticsStatCard(
-                    title = "Fired Hooks",
+                    title = "Triggered Hooks",
                     valStr = "${activeLogs.size}",
                     sub = "Zapier alerts",
-                    color = Color.Yellow,
+                    color = Color.White,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
-        // PROGRAMMATIC LINE CHART CARD (Canvas Bezier line charting)
+        // 2. SCAN ACTIVITY HERO CHART CARD
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "SCAN FREQUENCY TIMELINE (LAST 7 PERIODS)",
-                        style = MaterialTheme.typography.labelSmall.copy(color = EmeraldPrime, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Scan Activity",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 18.sp
+                                )
+                            )
+                            Text(
+                                text = when (chartRangeFilter) {
+                                    "7D" -> "Last 7 Days"
+                                    "30D" -> "Last 30 Days"
+                                    else -> "Last 90 Days"
+                                },
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
 
-                    // Draw program paths inside standard canvas
+                        // Style [7D ▼] Switcher
+                        Row(
+                            modifier = Modifier
+                                .background(SlateDark, RoundedCornerShape(10.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(10.dp))
+                                .clickable {
+                                    chartRangeFilter = when (chartRangeFilter) {
+                                        "7D" -> "30D"
+                                        "30D" -> "90D"
+                                        else -> "7D"
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = when (chartRangeFilter) {
+                                    "7D" -> "7D"
+                                    "30D" -> "30D"
+                                    else -> "90D"
+                                },
+                                color = EmeraldPrime,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Change timeline filter",
+                                tint = EmeraldPrime,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Chart data configuration
+                    val points = remember(chartRangeFilter) {
+                        when (chartRangeFilter) {
+                            "7D" -> listOf(0.12f, 0.45f, 0.3f, 0.85f, 0.6f, 0.95f, 0.75f)
+                            "30D" -> listOf(0.2f, 0.4f, 0.35f, 0.6f, 0.5f, 0.75f, 0.65f, 0.85f, 0.7f, 0.95f)
+                            else -> listOf(0.3f, 0.5f, 0.45f, 0.65f, 0.55f, 0.78f, 0.7f, 0.92f, 0.85f, 0.98f)
+                        }
+                    }
+                    val xLabels = remember(chartRangeFilter) {
+                        when (chartRangeFilter) {
+                            "7D" -> listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                            "30D" -> listOf("Jun 1", "Jun 5", "Jun 10", "Jun 15", "Jun 20", "Jun 25", "Jun 30")
+                            else -> listOf("Apr 1", "Apr 15", "May 1", "May 15", "Jun 1", "Jun 15", "Jun 30")
+                        }
+                    }
+
+                    // Pure visual high-fidelity Curve Canvas with translucent gradient fill
                     Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp)
+                            .height(160.dp)
                     ) {
-                        val stroke = Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        // Mock peaks for timeline values
-                        val points = listOf(0.1f, 0.45f, 0.3f, 0.85f, 0.6f, 0.95f, 0.75f)
+                        val stroke = Stroke(width = 3.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
                         val w = size.width
                         val h = size.height
                         
-                        // Draw grid lines
+                        // Thin grid lines
                         for (i in 0..4) {
                             val gy = h * (i / 4f)
-                            drawLine(Color.Gray.copy(alpha = 0.15f), start = Offset(0f, gy), end = Offset(w, gy))
+                            drawLine(Color.White.copy(alpha = 0.03f), start = Offset(0f, gy), end = Offset(w, gy))
                         }
 
                         val path = Path()
+                        val fillPath = Path()
+                        
+                        val pointCount = points.size
+                        val stepX = w / (pointCount - 1).toFloat()
+                        
                         points.forEachIndexed { idx, value ->
-                            val px = w * (idx / (points.size - 1).toFloat())
-                            val py = h - (h * value)
+                            val px = idx * stepX
+                            val py = h - (h * value * 0.80f) - 12.dp.toPx() // Clean padding inside chart canvas
+                            
                             if (idx == 0) {
                                 path.moveTo(px, py)
+                                fillPath.moveTo(px, py)
                             } else {
-                                val prevX = w * ((idx - 1) / (points.size - 1).toFloat())
-                                val prevY = h - (h * points[idx - 1])
-                                // Cubic bezier control curves
-                                path.cubicTo(
-                                    (prevX + px) / 2f, prevY,
-                                    (prevX + px) / 2f, py,
-                                    px, py
-                                )
+                                val prevX = (idx - 1) * stepX
+                                val prevY = h - (h * points[idx - 1] * 0.80f) - 12.dp.toPx()
+                                
+                                val controlX1 = prevX + (stepX / 2f)
+                                val controlY1 = prevY
+                                val controlX2 = prevX + (stepX / 2f)
+                                val controlY2 = py
+                                
+                                path.cubicTo(controlX1, controlY1, controlX2, controlY2, px, py)
+                                fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, px, py)
                             }
-                            drawCircle(color = EmeraldPrime, radius = 5.dp.toPx(), center = Offset(px, py))
                         }
                         
-                        drawPath(path = path, color = EmeraldPrime, style = stroke)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { label ->
-                            Text(label, color = Color.Gray, fontSize = 10.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // LOCATION AND DEVICE PLATFORMS ROW
-        item {
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Location Ranker Card
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = SlateCard),
-                    border = BorderStroke(1.dp, SlateBorder),
-                    modifier = Modifier.weight(1f).height(180.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("GEOLOCATION METRICS", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        // Close visual area fill to bottom edges
+                        fillPath.lineTo(w, h)
+                        fillPath.lineTo(0f, h)
+                        fillPath.close()
                         
-                        val mockLocations = listOf(
-                            Pair("San Francisco", 45),
-                            Pair("New York", 28),
-                            Pair("London Office", 18),
-                            Pair("Tokyo Japan", 9)
+                        // Draw vertical glow fill path
+                        drawPath(
+                            path = fillPath,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(EmeraldPrime.copy(alpha = 0.15f), Color.Transparent)
+                            )
                         )
                         
-                        mockLocations.forEach { loc ->
-                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(loc.first, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text("${loc.second}%", color = EmeraldPrime, fontSize = 11.sp)
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                // Horizontal fill progress
-                                Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(SlateLightBorder(), CircleShape)) {
-                                    Box(modifier = Modifier.fillMaxWidth(loc.second / 100f).height(4.dp).background(EmeraldPrime, CircleShape))
-                                }
-                            }
+                        // Draw main line path
+                        drawPath(path = path, color = EmeraldPrime, style = stroke)
+                        
+                        // Larger interactive data dots
+                        points.forEachIndexed { idx, value ->
+                            val px = idx * stepX
+                            val py = h - (h * value * 0.80f) - 12.dp.toPx()
+                            
+                            // Glowing aura
+                            drawCircle(
+                                color = EmeraldPrime.copy(alpha = 0.25f),
+                                radius = 7.dp.toPx(),
+                                center = Offset(px, py)
+                            )
+                            // Core point dot
+                            drawCircle(
+                                color = EmeraldPrime,
+                                radius = 4.dp.toPx(),
+                                center = Offset(px, py)
+                            )
                         }
                     }
-                }
 
-                // Device platforms Card
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = SlateCard),
-                    border = BorderStroke(1.dp, SlateBorder),
-                    modifier = Modifier.weight(1f).height(180.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("SCANNER DEVICES & OS", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(14.dp))
-                        
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PhoneAndroid, "Android Devices icon", tint = EmeraldPrime, modifier = Modifier.size(36.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text("Android (Mobile/Tablet)", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Text("62.5% density share", color = Color.LightGray, fontSize = 10.sp)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PhoneIphone, "Apple iOS scan icon", tint = IndigoAccent, modifier = Modifier.size(36.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text("iOS (iPhone/iPad)", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Text("37.5% density share", color = Color.LightGray, fontSize = 10.sp)
-                            }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    
+                    // Cleaner smaller x-axis labels
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        xLabels.forEach { label ->
+                            Text(
+                                text = label,
+                                color = Color.Gray,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }
             }
         }
 
-        // SCANS HEATMAP MATRIX (Canvas heatmap representation)
+        // 3. TOP GEOLOCATIONS CARD
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "DAILY ACTIVE TRAFFIC HEATMAP (TIME-OF-DAY MATRIX)",
-                        style = MaterialTheme.typography.labelSmall.copy(color = EmeraldPrime, fontWeight = FontWeight.Bold)
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
+                Column(modifier = Modifier.padding(20.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val hours = listOf("00H-04H", "04H-08H", "08H-12H", "12H-16H", "16H-20H", "20H-24H")
-                        hours.forEach { hr ->
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                Text(hr, fontSize = 8.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 4.dp))
-                                // Daily 7 blocks
-                                for (d in 0..6) {
-                                    val intensity = remember { (1..10).random() / 10f }
+                        Text(
+                            text = "Top Locations",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
+                            )
+                        )
+                        
+                        Text(
+                            text = "View All",
+                            color = EmeraldPrime,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable {
+                                    Toast.makeText(context, "Full geographic expansion loaded!", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    val mockLocations = listOf(
+                        Pair("San Francisco", 45),
+                        Pair("New York", 28),
+                        Pair("London", 18),
+                        Pair("Tokyo", 9)
+                    )
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        mockLocations.forEach { loc ->
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = loc.first,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${loc.second}%",
+                                        color = Color.Gray,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                // Thinner, modern progress bars
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .background(Color(0x14FFFFFF), CircleShape)
+                                ) {
                                     Box(
                                         modifier = Modifier
-                                            .padding(vertical = 2.dp)
-                                            .size(20.dp)
-                                            .clip(RoundedCornerShape(3.dp))
-                                            .background(EmeraldPrime.copy(alpha = intensity))
+                                            .fillMaxWidth(loc.second / 100f)
+                                            .height(6.dp)
+                                            .background(EmeraldPrime, CircleShape)
                                     )
                                 }
                             }
@@ -2078,9 +2278,246 @@ fun CampaignAnalyticsWorkspace(
                 }
             }
         }
+
+        // 4. DEVICE ANALYTICS CARD
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Device Distribution",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Android device distribution
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(SlateDark, RoundedCornerShape(16.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(16.dp))
+                                .padding(18.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhoneAndroid,
+                                    contentDescription = "Android platform",
+                                    tint = EmeraldPrime,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "Android",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "62.5%",
+                                color = Color.White,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .background(Color(0x14FFFFFF), CircleShape)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.625f)
+                                        .height(4.dp)
+                                        .background(EmeraldPrime, CircleShape)
+                                )
+                            }
+                        }
+
+                        // iOS device distribution
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(SlateDark, RoundedCornerShape(16.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(16.dp))
+                                .padding(18.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhoneIphone,
+                                    contentDescription = "iOS platform",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "iOS",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "37.5%",
+                                color = Color.White,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .background(Color(0x14FFFFFF), CircleShape)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.375f)
+                                        .height(4.dp)
+                                        .background(EmeraldPrime, CircleShape)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. TRAFFIC HEATMAP MATRIX
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Traffic Heatmap",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        )
+                    )
+                    Text(
+                        text = "Average activity by time of day",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                    val hours = listOf("00h", "04h", "08h", "12h", "16h", "20h")
+                    
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Day names on top
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.width(36.dp)) // Hour labels gap offset
+                            days.forEach { day ->
+                                Text(
+                                    text = day,
+                                    color = Color.Gray,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        
+                        // Hourly row sets
+                        hours.forEachIndexed { hIdx, hr ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = hr,
+                                    color = Color.Gray,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.width(36.dp)
+                                )
+                                
+                                days.forEachIndexed { dIdx, _ ->
+                                    val intensity = remember(hIdx, dIdx) {
+                                        val base = if (hIdx in 2..4) 0.65f else 0.18f
+                                        val dayMultiplier = if (dIdx in 1..4) 1.2f else 0.7f
+                                        (base * dayMultiplier).coerceIn(0.05f, 1.0f)
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1.5f) // Wider cells for nice modern grid alignment
+                                            .padding(2.dp)
+                                            .clip(RoundedCornerShape(4.dp)) // Rounded squares/rectangles
+                                            .background(EmeraldPrime.copy(alpha = intensity))
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Legend indicator
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Low", color = Color.Gray, fontSize = 11.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(70.dp)
+                                .height(5.dp)
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(EmeraldPrime.copy(alpha = 0.05f), EmeraldPrime)
+                                    ),
+                                    shape = CircleShape
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("High", color = Color.Gray, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
         
         item {
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -2095,21 +2532,197 @@ fun AnalyticsStatCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = SlateCard),
         border = BorderStroke(1.dp, SlateBorder)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(title, color = Color(0xFFCAC4D0), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(valStr, color = color, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(sub, color = Color(0xFFCAC4D0).copy(alpha = 0.8f), fontSize = 8.sp)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                color = Color.Gray,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = valStr,
+                color = color,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = sub,
+                color = Color.Gray,
+                fontSize = 11.sp
+            )
         }
     }
 }
 
 // ADVANCED COOPERATION SETTINGS (Password protection, Webhooks simulation logs, CSV merging generator)
+@Composable
+fun AdvancedSectionHeader(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    badgeText: String? = null,
+    badgeColor: Color = Color.Gray
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(Color(0x0AFFFFFF), CircleShape)
+                    .border(BorderStroke(1.dp, Color(0x14FFFFFF)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color(0xFFD8B4FE), // Lavender accent
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        letterSpacing = (-0.3).sp
+                    )
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color.Gray,
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+        
+        if (badgeText != null) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(badgeColor.copy(alpha = 0.1f))
+                    .border(BorderStroke(1.dp, badgeColor.copy(alpha = 0.2f)), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(badgeColor, CircleShape)
+                    )
+                    Text(
+                        text = badgeText.uppercase(),
+                        color = badgeColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdvancedPrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .height(50.dp)
+            .fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFD8B4FE), // Premium Filled lavender
+            contentColor = Color(0xFF08080D) // Contrast text
+        ),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color(0xFF08080D),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = text,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun AdvancedSecondaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    textColor: Color = Color(0xFFCAC4D0)
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier
+            .height(50.dp)
+            .fillMaxWidth(),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = textColor
+        ),
+        border = BorderStroke(1.dp, SlateBorder),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = text,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
 @Composable
 fun AdvancedSettingsWorkspace(
     viewModel: QrViewModel
@@ -2122,182 +2735,326 @@ fun AdvancedSettingsWorkspace(
     var testPasswordText by remember { mutableStateOf("") }
     var revealedContentAlert by remember { mutableStateOf<String?>(null) }
 
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+    // Navigation and show control toggles
+    var showWebhookLogs by remember { mutableStateOf(false) }
+    var showApiKey by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp) // Perfect spacing between sections
+    ) {
+        // Page Header Title Segment
         item {
-            Text(
-                text = "Advanced Tools & Team Workspace",
-                style = MaterialTheme.typography.titleMedium.copy(color = Color.White, fontWeight = FontWeight.Bold)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+            Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)) {
+                Text(
+                    text = "Advanced workspace",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        letterSpacing = (-0.5).sp
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Developer tools and automation features",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
+                )
+            }
         }
 
-        // Webhooks payload tracker
+        // 1. Webhook activity Card Section
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ElectricBolt, "Webhook Zapier symbol", tint = Color.Yellow, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "LIVE WEBHOOK OUTBOX (ZAPIER / INTERGROMAT)",
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Every time a dynamic QR Architect code is scanned on a customer device, a webhook alert can trigger instantly. Simulate events below by tapping on any item inside the Library drawer.",
-                        color = Color.Gray,
-                        fontSize = 11.sp
+                Column(modifier = Modifier.padding(20.dp)) { // 20px dynamic card internal padding
+                    AdvancedSectionHeader(
+                        icon = Icons.Default.ElectricBolt,
+                        title = "Webhook activity",
+                        subtitle = "Monitor external automation events",
+                        badgeText = if (viewModel.webhookLogs.isNotEmpty()) "Active" else "No activity",
+                        badgeColor = if (viewModel.webhookLogs.isNotEmpty()) EmeraldPrime else Color.Gray
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    if (viewModel.webhookLogs.isEmpty()) {
+                    Text(
+                        text = "Every time a dynamic QR Architect code is scanned on a customer device, a webhook alert can trigger instantly. Webhooks route automatically to integrated automation platforms.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Instance Status",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(if (viewModel.webhookLogs.isNotEmpty()) EmeraldPrime else Color.Gray, CircleShape)
+                            )
+                            Text(
+                                text = if (viewModel.webhookLogs.isNotEmpty()) "Events Active" else "No events received",
+                                color = if (viewModel.webhookLogs.isNotEmpty()) EmeraldPrime else Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (showWebhookLogs) {
+                        Spacer(modifier = Modifier.height(14.dp))
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .background(SlateDark, RoundedCornerShape(8.dp))
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .height(150.dp)
+                                        .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                                        .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                                        .padding(16.dp)
                         ) {
-                            Text("No webhooks fired yet in current instance. Scan demo QR codes.", color = Color.DarkGray, fontSize = 11.sp)
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .background(SlateDark, RoundedCornerShape(8.dp))
-                                .verticalScroll(rememberScrollState())
-                                .padding(8.dp)
-                        ) {
-                            viewModel.webhookLogs.forEach { log ->
-                                Text(
-                                    text = log,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.sp,
-                                    color = EmeraldPrime,
-                                    modifier = Modifier.padding(bottom = 6.dp)
-                                )
-                                Divider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 4.dp))
+                            if (viewModel.webhookLogs.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "Log streams are currently clean.", 
+                                        color = Color.DarkGray, 
+                                        fontSize = 12.sp, 
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            } else {
+                                Box(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                                    Column {
+                                        viewModel.webhookLogs.forEachIndexed { idx, log ->
+                                            Text(
+                                                text = log,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                color = Color(0xFFD8B4FE), // Lavender text for logs
+                                                modifier = Modifier.padding(bottom = 6.dp)
+                                            )
+                                            if (idx < viewModel.webhookLogs.size - 1) {
+                                                Divider(color = Color(0x0DFFFFFF), modifier = Modifier.padding(vertical = 4.dp))
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    AdvancedSecondaryButton(
+                        text = if (showWebhookLogs) "Hide logs" else "View logs",
+                        icon = if (showWebhookLogs) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        onClick = { showWebhookLogs = !showWebhookLogs }
+                    )
                 }
             }
         }
 
-        // CSV Batch generator block
+        // 2. Batch generator Card Section
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.DriveFileRenameOutline, "CSV import file icon", tint = EmeraldPrime)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "BULK CSV GENERATOR MODULE",
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Input row definitions in comma-separated strings (Title,Content,CampaignTag,SubFolder). Ideal for generating cards or coupons in batches.",
-                        color = Color.Gray,
-                        fontSize = 11.sp
+                Column(modifier = Modifier.padding(20.dp)) {
+                    AdvancedSectionHeader(
+                        icon = Icons.Default.Description,
+                        title = "Batch generator",
+                        subtitle = "Generate QR cards from CSV templates"
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    OutlinedTextField(
-                        value = viewModel.csvInputText,
-                        onValueChange = { viewModel.csvInputText = it },
+                    Text(
+                        text = "Input row definitions in comma-separated structures (Title,Content,CampaignTag,SubFolder). Ideal for generating cards or coupons in automated batch operations.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Code editor layout
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(100.dp)
-                            .testTag("csv_input_field"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = SlateDark,
-                            unfocusedContainerColor = SlateDark,
-                            unfocusedBorderColor = SlateBorder
-                        ),
-                        placeholder = { Text("CSV: Title,Content,Tag,Folder") }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Button(
-                        onClick = { viewModel.processCsvBatchGeneration() },
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrime),
-                        modifier = Modifier
-                            .align(Alignment.End)
-                            .height(38.dp)
-                            .testTag("csv_process_button")
+                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                            .padding(14.dp)
                     ) {
-                        Text("BATCH REST API SYNCHRONIZE", color = SlateDark, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "template.csv",
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF64748B),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "UTF-8",
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF64748B),
+                                fontSize = 10.sp
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = viewModel.csvInputText,
+                            onValueChange = { viewModel.csvInputText = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .testTag("csv_input_field"),
+                            textStyle = TextStyle(
+                                fontFamily = FontFamily.Monospace,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            placeholder = {
+                                Text(
+                                    text = "Promo Badge,https://deal.co/badge1,Marketing,Sales",
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF475569),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        )
                     }
 
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    AdvancedPrimaryButton(
+                        text = "Generate batch",
+                        icon = Icons.Default.Check,
+                        onClick = { viewModel.processCsvBatchGeneration() }
+                    )
+
                     if (viewModel.batchGenerateResultMsg.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = viewModel.batchGenerateResultMsg,
-                            color = EmeraldPrime,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = viewModel.batchGenerateResultMsg,
+                                fontFamily = FontFamily.Monospace,
+                                color = EmeraldPrime,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Password protected portal simulation
+        // 3. Security tools Card Section
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LockClock, "Lock Clock Icon", tint = Color.LightGray)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "SECURITY TESTING portal",
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Test standard decryption on codes setup with custom access locks. Input password to reveal the locked URL.",
-                        color = Color.Gray,
-                        fontSize = 11.sp
+                Column(modifier = Modifier.padding(20.dp)) {
+                    AdvancedSectionHeader(
+                        icon = Icons.Default.Lock,
+                        title = "Security tools",
+                        subtitle = "Protected access and encrypted links",
+                        badgeText = "Protected",
+                        badgeColor = EmeraldPrime
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Test instant credentials decryption on secure codes set up with physical access blocks. Input standard passphrase to decrypt simulated database payloads.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedTextField(
                             value = testPasswordText,
                             onValueChange = { testPasswordText = it },
-                            placeholder = { Text("Input passcode (Try: AccessGranted77)") },
+                            placeholder = { Text("Input passcode (AccessGranted77)", fontSize = 13.sp) },
                             singleLine = true,
+                            leadingIcon = { 
+                                Icon(
+                                    imageVector = Icons.Default.Lock, 
+                                    contentDescription = "Lock icon", 
+                                    tint = Color(0xFFD8B4FE), 
+                                    modifier = Modifier.size(18.dp)
+                                ) 
+                            },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(52.dp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedContainerColor = SlateDark, unfocusedContainerColor = SlateDark)
+                                .height(50.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0x33D8B4FE),
+                                unfocusedBorderColor = SlateBorder,
+                                focusedContainerColor = SlateDark,
+                                unfocusedContainerColor = SlateDark
+                            ),
+                            shape = RoundedCornerShape(14.dp)
                         )
 
                         Button(
@@ -2308,81 +3065,315 @@ fun AdvancedSettingsWorkspace(
                                     revealedContentAlert = "FAILED: Incorrect passcode verification! Connection rejected."
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = IndigoAccent, contentColor = SlateDark),
-                            modifier = Modifier.height(52.dp)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD8B4FE), // Filled lavender
+                                contentColor = Color(0xFF08080D)
+                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.height(50.dp)
                         ) {
-                            Text("DECRYPT", color = SlateDark, fontWeight = FontWeight.Bold)
+                            Text("Decrypt", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
 
                     revealedContentAlert?.let { alert ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = alert,
-                            color = if (alert.startsWith("SUCCESS")) EmeraldPrime else Color.Yellow,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = alert,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                color = if (alert.startsWith("SUCCESS")) EmeraldPrime else Color(0xFFEF4444),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // REST Simulated Keys Workspace
+        // 4. API credentials Card Section
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Key, "Workspace API logo", tint = EmeraldPrime)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "REST COMPLEMENTARY API SEEDS & SCOPES",
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "For teams programmatically generating labels. Rotate workspace credentials for dynamic access tokens.",
-                        color = Color.Gray,
-                        fontSize = 11.sp
+                Column(modifier = Modifier.padding(20.dp)) {
+                    AdvancedSectionHeader(
+                        icon = Icons.Default.Key,
+                        title = "API credentials",
+                        subtitle = "Manage tokens and secret scopes"
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "For development teams programmatically synchronizing dynamic QR campaigns. Rotate credentials workspace seeds to cycle tokens dynamically.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedTextField(
-                        value = inputSecretKey,
-                        onValueChange = { inputSecretKey = it },
+                        value = if (showApiKey) inputSecretKey else "sec_k_****************4183",
+                        onValueChange = {},
                         readOnly = true,
-                        leadingIcon = { Icon(Icons.Default.VpnKey, "Key symbol icon", tint = Color.Gray) },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.VpnKey, contentDescription = "Vpn key symbol", tint = Color(0xFFD8B4FE), modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            IconButton(onClick = { showApiKey = !showApiKey }) {
+                                Icon(
+                                    imageVector = if (showApiKey) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (showApiKey) "Hide API Key" else "Show API Key",
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, focusedContainerColor = SlateDark, unfocusedContainerColor = SlateDark)
+                        textStyle = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            color = Color.White
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0x33D8B4FE),
+                            unfocusedBorderColor = SlateBorder,
+                            focusedContainerColor = Color(0xFF0F1020),
+                            unfocusedContainerColor = Color(0xFF0F1020)
+                        ),
+                        shape = RoundedCornerShape(14.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    Button(
-                        onClick = {
-                            val keys = "sec_k_" + UUID.randomUUID().toString().replace("-", "").take(16)
-                            inputSecretKey = keys
-                            generatedApiAlertMsg = "Flashed rotation completed! Stored scopes authorized: ['READ_ANALYTICS', 'PUT_REDIRECTS', 'WRITE_CODES']"
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = IndigoAccent, contentColor = SlateDark),
-                        modifier = Modifier.height(38.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("ROTATE SECRET SCOPES", color = SlateDark, fontWeight = FontWeight.Bold)
+                        AdvancedSecondaryButton(
+                            text = "Copy key",
+                            icon = Icons.Default.ContentCopy,
+                            onClick = {
+                                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("API Key", inputSecretKey)
+                                clipboardManager.setPrimaryClip(clip)
+                                Toast.makeText(context, "Copied workspace token!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        AdvancedPrimaryButton(
+                            text = "Rotate key",
+                            icon = Icons.Default.Refresh,
+                            onClick = {
+                                val keys = "sec_k_" + java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+                                inputSecretKey = keys
+                                generatedApiAlertMsg = "Credentials seed rotated successfully! Active scopes: ['READ_ANALYTICS', 'PUT_REDIRECTS', 'WRITE_CODES']"
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0x0AFFFFFF), RoundedCornerShape(12.dp))
+                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Warning icon",
+                            tint = Color(0xFFEF4444).copy(alpha = 0.8f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Treat this key like a password. Never share it in public code repositories.",
+                            color = Color.LightGray,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
                     generatedApiAlertMsg?.let { msg ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = msg,
-                            color = EmeraldPrime,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = msg,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                color = EmeraldPrime,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Team settings Card Section
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    AdvancedSectionHeader(
+                        icon = Icons.Default.People,
+                        title = "Team settings",
+                        subtitle = "Assign roles and collaborate with members",
+                        badgeText = "Beta",
+                        badgeColor = Color(0xFFD8B4FE)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Invite campaign coordinators, sales representatives, or marketing designers to generate and analyze dynamic QR triggers seamlessly.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(Color(0x14FFFFFF), CircleShape)
+                                    .border(BorderStroke(1.dp, Color(0x0AFFFFFF)), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("A", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column {
+                                Text("Anand Kislay", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("anandkislay1803@gmail.com", color = Color.Gray, fontSize = 11.sp)
+                            }
+                        }
+                        Text("Owner", color = Color(0xFFD8B4FE), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    AdvancedSecondaryButton(
+                        text = "Invite team member",
+                        icon = Icons.Default.Add,
+                        onClick = {
+                            Toast.makeText(context, "Collaboration invites enabled on premium instances!", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+            }
+        }
+
+        // 6. Developer utilities Card Section
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    AdvancedSectionHeader(
+                        icon = Icons.Default.Settings,
+                        title = "Developer utilities",
+                        subtitle = "Workspace diagnostic reports and telemetry logger"
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Manage local SDK telemetry diagnostic settings or flush localized offline records databases to perform clean instances setup operations.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Telemetry & analytics logging", color = Color.White, fontSize = 13.sp)
+                        var isTelemetryActive by remember { mutableStateOf(true) }
+                        Switch(
+                            checked = isTelemetryActive,
+                            onCheckedChange = { isTelemetryActive = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFF08080D),
+                                checkedTrackColor = Color(0xFFD8B4FE),
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = SlateDark
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        AdvancedSecondaryButton(
+                            text = "Download schema",
+                            icon = Icons.Default.Download,
+                            onClick = {
+                                Toast.makeText(context, "JSON Schema download initiated!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        AdvancedSecondaryButton(
+                            text = "Clear cache",
+                            icon = Icons.Default.DeleteOutline,
+                            textColor = Color(0xFFEF4444), // Danger outline action
+                            onClick = {
+                                Toast.makeText(context, "Offline schema caches cleared!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -2390,7 +3381,7 @@ fun AdvancedSettingsWorkspace(
         }
 
         item {
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -2416,239 +3407,485 @@ fun DetailActionsSidebar(
     Surface(
         modifier = Modifier
             .fillMaxHeight()
-            .width(280.dp)
-            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
-            .testTag("detail_sidebar"),
-        color = SlateCard,
-        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Header close button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "INTELLIGENT INSIGHTS",
-                    style = MaterialTheme.typography.labelSmall.copy(color = EmeraldPrime, fontWeight = FontWeight.Bold)
-                )
-
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close detailed insights panel", tint = Color.White)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Centered QR Code Preview
-            Box(
-                modifier = Modifier
-                    .size(160.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White)
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    bitmap = fullSizeBitmap,
-                    contentDescription = "Full visual QR",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                qr.title,
-                style = MaterialTheme.typography.titleMedium.copy(color = Color.White, fontWeight = FontWeight.Bold),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+            .width(360.dp) // Wider sidebar for a less cramped, premium presentation
+            .border(
+                BorderStroke(1.dp, SlateBorder),
+                RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
             )
-
-            // Dynamic Action Status Toggle
-            Row(
+            .testTag("detail_sidebar"),
+        color = SlateDark, // Main background is deep #08080D
+        shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // ==========================================
+            // STICKY HEADER LAYOUT (Kept fixed at the top)
+            // ==========================================
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-                    .background(SlateDark, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column {
-                    Text("ACTIVE STATE", color = Color.Gray, fontSize = 9.sp)
+                // Title and close row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = if (qr.isActive) "ACTIVE (LIVE)" else "PAUSED (OFF)",
-                        color = if (qr.isActive) EmeraldPrime else Color.Yellow,
+                        text = "QR CODE DETAILS",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = EmeraldPrime,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        )
+                    )
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(SlateCard, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close detailed insights panel",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                // QR Preview Card (Hero Section)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(
+                            elevation = 12.dp,
+                            shape = RoundedCornerShape(20.dp),
+                            clip = false,
+                            spotColor = Color.Black
+                        )
+                        .testTag("detail_qr_preview_hero"),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard), // slightly lighter bg card
+                    border = BorderStroke(1.dp, SlateBorder), // outer subtle border
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // QR Box (Increased size & rounded corner padding)
+                        Box(
+                            modifier = Modifier
+                                .size(170.dp) // Increased size
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.White)
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = fullSizeBitmap,
+                                contentDescription = "Full visual QR",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // QR Name/Title below preview with proper bold typography
+                        Text(
+                            text = qr.title,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            ),
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (!qr.tag.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = qr.tag!!.uppercase(),
+                                color = EmeraldPrime,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                    }
+                }
+
+                // Primary Action Button: TEST SCAN (height 48dp, radius 14dp)
+                Button(
+                    onClick = onTriggerScanSimulation,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EmeraldPrime,
+                        contentColor = SlateDark
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("sim_scan_button"),
+                    shape = RoundedCornerShape(14.dp) // 14dp radius per requirements
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhoneIphone,
+                        contentDescription = "Test scan button symbol",
+                        modifier = Modifier.size(16.dp),
+                        tint = SlateDark
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "TEST SCAN",
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
+                        color = SlateDark
                     )
                 }
 
-                Switch(
-                    checked = qr.isActive,
-                    onCheckedChange = { viewModel.toggleActivation(qr) },
-                    colors = SwitchDefaults.colors(checkedThumbColor = EmeraldPrime)
-                )
-            }
-
-            // SIMULATED SCAN TRIGGER BUTTON
-            Button(
-                onClick = onTriggerScanSimulation,
-                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrime, contentColor = SlateDark),
-                modifier = Modifier.fillMaxWidth().height(36.dp).testTag("sim_scan_button")
-            ) {
-                Icon(Icons.Default.PhoneIphone, "scan emulator launch", modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("TRIGGER SIMULATED SCAN", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // DYNAMIC ROUTING PANEL
-            if (qr.type == "URL") {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = SlateDark),
-                    border = BorderStroke(1.dp, SlateBorder),
-                    modifier = Modifier.fillMaxWidth()
+                // Row for Download and Save Design (Fixed elements)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Shuffle, "redirection node symbol", tint = EmeraldPrime, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("DYNAMIC ROUTE LINK", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
+                    // Download
+                    Button(
+                        onClick = {
+                            val rendered = QrGenerator.generateQrBitmap(qr, 512)
+                            val savedUri = saveBitmapToGallery(context, rendered, qr.title)
+                            if (savedUri != null) {
+                                Toast.makeText(context, "PNG design exported successfully!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Could not write to local storage.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SlateDark,
+                            contentColor = Color.White
+                        ),
+                        border = BorderStroke(1.dp, SlateBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("download_button"),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download Design",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("DOWNLOAD", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
 
-                        OutlinedTextField(
-                            value = editingUrl,
-                            onValueChange = { editingUrl = it },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodySmall.copy(color = Color.White, fontSize = 10.sp),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrime, unfocusedBorderColor = SlateBorder)
+                    // Save Design
+                    Button(
+                        onClick = {
+                            if (qr.type == "URL") {
+                                viewModel.changeRedirectUrl(qr, editingUrl)
+                                Toast.makeText(context, "Design and routing details synced!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "All parameters are already active!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF161525),
+                            contentColor = EmeraldPrime
+                        ),
+                        border = BorderStroke(1.dp, SlateBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("detail_save_button"),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = "Save Design details",
+                            modifier = Modifier.size(16.dp),
+                            tint = EmeraldPrime
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("SAVE DESIGN", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = EmeraldPrime)
+                    }
+                }
+            }
+
+            // Divider separating Sticky and Scrollable
+            Divider(color = SlateBorder, thickness = 1.dp)
+
+            // ==========================================
+            // SCROLLABLE CONTENT AREA (Independently scrolling)
+            // ==========================================
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Status Section
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                    border = BorderStroke(1.dp, SlateBorder),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "STATUS",
+                                color = Color.Gray,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (qr.isActive) "🟢 Active" else "🔴 Paused",
+                                color = if (qr.isActive) EmeraldPrime else Color.Red,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 16.sp
+                            )
+                        }
+
+                        Switch(
+                            checked = qr.isActive,
+                            onCheckedChange = { viewModel.toggleActivation(qr) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = EmeraldPrime,
+                                checkedTrackColor = EmeraldPrime.copy(alpha = 0.4f),
+                                uncheckedThumbColor = Color.LightGray,
+                                uncheckedTrackColor = Color.DarkGray
+                            )
+                        )
+                    }
+                }
+
+                // Analytics Section
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                    border = BorderStroke(1.dp, SlateBorder),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            text = "ANALYTICS",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
                         )
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Divider(color = SlateBorder, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        Button(
-                            onClick = {
-                                viewModel.changeRedirectUrl(qr, editingUrl)
-                                Toast.makeText(context, "Redirect URL configured live! reprint unnecessary.", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = IndigoAccent, contentColor = SlateDark),
-                            modifier = Modifier.align(Alignment.End).height(32.dp).testTag("routing_update_button")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("UPDATE DESTINATION", fontSize = 9.sp, color = SlateDark, fontWeight = FontWeight.Bold)
+                            Text("Scans (30 Days)", color = Color.Gray, fontSize = 12.sp)
+                            Text(
+                                text = "${qr.scanCount}",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
-                        // Redirection logs trail
-                        if (qr.redirectHistoryJson != "[]") {
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Encoding Format", color = Color.Gray, fontSize = 12.sp)
                             Text(
-                                text = "Redirect Log History",
-                                color = EmeraldPrime,
-                                fontSize = 9.sp,
-                                modifier = Modifier
-                                    .padding(top = 4.dp)
-                                    .clickable { showRedirectionLog = !showRedirectionLog }
+                                text = "${qr.errorCorrectionLevel}-Level",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Created Date", color = Color.Gray, fontSize = 12.sp)
+                            val format = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+                            val formattedDate = format.format(Date(qr.creationDate))
+                            Text(
+                                text = formattedDate,
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Styling/Dynamic Redirection details (URLs only)
+                if (qr.type == "URL") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SlateCard),
+                        border = BorderStroke(1.dp, SlateBorder),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Text(
+                                text = "STYLING CONFIGURATION",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
                             )
 
-                            if (showRedirectionLog) {
-                                Text(
-                                    qr.redirectHistoryJson,
-                                    fontSize = 8.sp,
-                                    color = Color.LightGray,
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    fontFamily = FontFamily.Monospace
-                                )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = editingUrl,
+                                onValueChange = { editingUrl = it },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodySmall.copy(color = Color.White, fontSize = 12.sp),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = EmeraldPrime,
+                                    unfocusedBorderColor = SlateBorder,
+                                    focusedContainerColor = SlateDark,
+                                    unfocusedContainerColor = SlateDark
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Button(
+                                onClick = {
+                                    viewModel.changeRedirectUrl(qr, editingUrl)
+                                    Toast.makeText(context, "Destination updated successfully", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrime, contentColor = SlateDark),
+                                modifier = Modifier
+                                    .align(Alignment.End)
+                                    .height(36.dp)
+                                    .testTag("routing_update_button"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("UPDATE DESTINATION", fontSize = 10.sp, color = SlateDark, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
 
-            // CORE METRICS DRILL DOWN
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SlateDark),
-                border = BorderStroke(1.dp, SlateBorder)
-            ) {
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Text("LIFETIME ANALYTICS STATS", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Scans Count Last 30d:", color = Color.LightGray, fontSize = 10.sp)
-                        Text("${qr.scanCount} totals", color = EmeraldPrime, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Divider(color = SlateBorder, modifier = Modifier.padding(vertical = 4.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Asset Encoding Format:", color = Color.LightGray, fontSize = 10.sp)
-                        Text(qr.errorCorrectionLevel + " Level", color = Color.White, fontSize = 10.sp)
-                    }
-                    Divider(color = SlateBorder, modifier = Modifier.padding(vertical = 4.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Created stamp:", color = Color.LightGray, fontSize = 10.sp)
-                        val format = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-                        Text(format.format(Date(qr.creationDate)), color = Color.LightGray, fontSize = 10.sp)
-                    }
+                // Secondary Action: CLONE QR (Height 48dp, Radius 14dp)
+                Button(
+                    onClick = {
+                        viewModel.duplicateQr(qr)
+                        Toast.makeText(context, "Clone replicated successfully!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, SlateBorder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("duplicate_button"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FileCopy,
+                        contentDescription = "Duplicate design clone",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Clone QR", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
                 }
-            }
 
-            Spacer(modifier = Modifier.height(14.dp))
+                // Secondary Action: EDIT STYLE (Height 48dp, Radius 14dp)
+                Button(
+                    onClick = {
+                        viewModel.loadForEditing(qr)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, SlateBorder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("edit_load_button"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ColorLens,
+                        contentDescription = "Edit Style palette",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Edit Style", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
 
-            // COPY, RESTORE AND DESTRUCTION ROW
-            Button(
-                onClick = {
-                    viewModel.duplicateQr(qr)
-                    Toast.makeText(context, "Duplicated design replica, check catalog!", Toast.LENGTH_SHORT).show()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = SlateDark),
-                border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().height(40.dp).testTag("duplicate_button")
-            ) {
-                Icon(Icons.Default.FileCopy, "duplicate clone", modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("CLONE REPLICA ASSET", fontSize = 10.sp, color = Color.White)
-            }
+                Spacer(modifier = Modifier.height(4.dp))
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Button(
-                onClick = {
-                    viewModel.loadForEditing(qr)
-                    onDismiss()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = SlateDark),
-                border = BorderStroke(1.dp, SlateBorder),
-                modifier = Modifier.fillMaxWidth().height(40.dp).testTag("edit_load_button")
-            ) {
-                Icon(Icons.Default.Edit, "Edit load", modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("EDIT STYLING DETAILS", fontSize = 10.sp, color = Color.White)
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Button(
-                onClick = {
-                    viewModel.deleteQr(qr)
-                    onDismiss()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0x27EF4444)),
-                border = BorderStroke(1.dp, Color.Red),
-                modifier = Modifier.fillMaxWidth().height(40.dp).testTag("delete_button")
-            ) {
-                Icon(Icons.Default.Delete, "destruction icon", tint = Color.Red, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("DELETE FROM LIST", fontSize = 10.sp, color = Color.Red)
+                // Danger Zone Action: DELETE QR (Height 48dp, Radius 14dp, Red outline)
+                Button(
+                    onClick = {
+                        viewModel.deleteQr(qr)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Red
+                    ),
+                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("delete_button"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete design asset",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.Red
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete QR", fontSize = 14.sp, color = Color.Red, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -2662,7 +3899,19 @@ fun QrBottomNavigation(
 ) {
     NavigationBar(
         containerColor = SlateCard,
-        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars).height(62.dp)
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .height(82.dp) // Generous height for premium spacing
+            .shadow(
+                elevation = 12.dp,
+                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+                clip = false
+            )
+            .border(
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
+            ),
+        tonalElevation = 0.dp // Keeps SlateCard pure dark without unwanted light elevation tint
     ) {
         val items = listOf(
             Pair("library", Triple("Library", Icons.Default.LibraryBooks, Icons.Default.LibraryBooks)),
@@ -2680,22 +3929,23 @@ fun QrBottomNavigation(
                     Icon(
                         imageVector = if (isSelected) item.second.second else item.second.third,
                         contentDescription = item.second.first,
-                        tint = if (isSelected) SlateDark else Color(0xFF938F99),
-                        modifier = Modifier.size(24.dp)
+                        tint = if (isSelected) SlateDark else Color(0xFF94A3B8), // Premium Slate color for unselected icon
+                        modifier = Modifier.size(26.dp) // Large premium icon size
                     )
                 },
                 label = {
                     Text(
                         text = item.second.first,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) EmeraldPrime else Color(0xFF938F99),
-                        fontSize = 11.sp
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) Color.White else Color(0xFF64748B), // Brighter white for active, soft slate for inactive
+                        fontSize = 12.sp,
+                        letterSpacing = 0.2.sp
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = EmeraldPrime,
+                    indicatorColor = Color(0xFFD8B4FE), // Beautiful rounded lavender/purple pill
                     selectedIconColor = SlateDark,
-                    unselectedIconColor = Color(0xFF938F99)
+                    unselectedIconColor = Color(0xFF64748B)
                 )
             )
         }
