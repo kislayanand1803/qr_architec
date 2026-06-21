@@ -3784,29 +3784,24 @@ fun AdvancedSettingsWorkspace(
 ) {
     val context = LocalContext.current
     var inputSecretKey by remember { mutableStateOf("sec_k_lqmzpwxv92984183") }
-    var generatedApiAlertMsg by remember { mutableStateOf<String?>(null) }
-    
-    // Password portal test
     var testPasswordText by remember { mutableStateOf("") }
-    var revealedContentAlert by remember { mutableStateOf<String?>(null) }
 
     // Navigation and show control toggles
     var showWebhookLogs by remember { mutableStateOf(false) }
-    var showApiKey by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp) // Perfect spacing between sections
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Page Header Title Segment
+        // Page Header Title Segment - Sentence Case and SF Pro / Premium Dashboard Style
         item {
             Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)) {
                 Text(
-                    text = "Advanced workspace",
+                    text = "Advanced Workspace",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 24.sp,
                         letterSpacing = (-0.5).sp
@@ -3817,88 +3812,13 @@ fun AdvancedSettingsWorkspace(
                     text = "Developer tools and automation features",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = Color.Gray,
-                        fontSize = 13.sp
+                        fontSize = 14.sp
                     )
                 )
             }
         }
 
-        // 1. Webhook activity Card Section
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, SlateBorder),
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth().testTag("advanced_brand_identity_card")
-            ) {
-                Row(
-                    modifier = Modifier.clickable { viewModel.setTab("brand") }.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .background(Color(0xFFD8B4FE).copy(alpha = 0.1f), CircleShape)
-                                .border(BorderStroke(1.dp, Color(0xFFD8B4FE).copy(alpha = 0.25f)), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = "Brand Identity Palette Icon",
-                                tint = Color(0xFFD8B4FE),
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    text = "Brand Assets",
-                                    style = TextStyle(
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        letterSpacing = (-0.3).sp
-                                    )
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0xFFD8B4FE).copy(alpha = 0.15f))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text("WORKSPACE", color = Color(0xFFD8B4FE), fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Logos, colors, typography and design resources",
-                                style = TextStyle(
-                                    color = Color.Gray,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp
-                                )
-                            )
-                        }
-                    }
-                    
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Expand brand assets",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        // 2. Webhook activity Card Section (Automation Tools)
+        // Section 1: Automation Card
         item {
             val isActive = viewModel.webhookLogs.isNotEmpty()
             Card(
@@ -3908,7 +3828,7 @@ fun AdvancedSettingsWorkspace(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    // Header Row with ⚡ Automation Tools on the Left, Pill Badge on the Right
+                    // Header Row: Icon, Title on Left, Status Badge on Right
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -3935,25 +3855,25 @@ fun AdvancedSettingsWorkspace(
                             }
                             Column {
                                 Text(
-                                    text = "Automation Tools",
+                                    text = "Automation",
                                     style = TextStyle(
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
+                                        fontSize = 16.sp,
                                         letterSpacing = (-0.3).sp
                                     )
                                 )
                                 Text(
-                                    text = "Monitor external automation events and webhooks",
+                                    text = "Manage webhooks and external integrations",
                                     style = TextStyle(
                                         color = Color.Gray,
-                                        fontSize = 11.sp
+                                        fontSize = 12.sp
                                     )
                                 )
                             }
                         }
 
-                        // Compact Pill Status Badge
+                        // Compact Pill Status Badge - Height 28dp, gray background for inactive state
                         Box(
                             modifier = Modifier
                                 .height(28.dp)
@@ -3963,7 +3883,7 @@ fun AdvancedSettingsWorkspace(
                                     BorderStroke(1.dp, if (isActive) Color(0xFF10B981).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.1f)),
                                     RoundedCornerShape(999.dp)
                                 )
-                                .padding(horizontal = 10.dp),
+                                .padding(horizontal = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(
@@ -3976,7 +3896,7 @@ fun AdvancedSettingsWorkspace(
                                         .background(if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8), CircleShape)
                                 )
                                 Text(
-                                    text = if (isActive) "Active" else "No Activity",
+                                    text = if (isActive) "Active" else "No activity",
                                     color = if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -3987,19 +3907,19 @@ fun AdvancedSettingsWorkspace(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Body description text (limit to max 2 lines with 70% opacity)
+                    // Description - max 2 lines, 70% opacity
                     Text(
-                        text = "Webhook events are triggered when QR codes are scanned and routed to external automation platforms.",
+                        text = "Connect QR events to external automation platforms.",
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Compact Information sections
+                    // Compact Information section
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -4029,7 +3949,7 @@ fun AdvancedSettingsWorkspace(
                                         .background(if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8), CircleShape)
                                 )
                                 Text(
-                                    text = if (isActive) "Active" else "No Activity",
+                                    text = if (isActive) "Active" else "No activity",
                                     color = if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
@@ -4069,7 +3989,7 @@ fun AdvancedSettingsWorkspace(
                         }
                     }
 
-                    // Optional Expanded Log Stream Panel
+                    // Webhook Active logs (only visible if View Logs clicked)
                     if (showWebhookLogs) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Box(
@@ -4109,14 +4029,14 @@ fun AdvancedSettingsWorkspace(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Buttons/Action section (48px high with 14px border radius)
+                    // Buttons section - 48px high with 14px border radius
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
                             onClick = {
-                                Toast.makeText(context, "Webhook properties validated at /api/v1/webhook", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Webhook parameters initialized successfully", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -4156,7 +4076,7 @@ fun AdvancedSettingsWorkspace(
             }
         }
 
-        // 2. Batch generator Card Section
+        // Section 2: Security Card
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
@@ -4165,491 +4085,231 @@ fun AdvancedSettingsWorkspace(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    AdvancedSectionHeader(
-                        icon = Icons.Default.Description,
-                        title = "Automation Tools: Batch Generator",
-                        subtitle = "Generate QR cards from CSV templates"
-                    )
+                    // Header row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0x0AFFFFFF), CircleShape)
+                                .border(BorderStroke(1.dp, Color(0x14FFFFFF)), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = Color(0xFFD8B4FE),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Security",
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    letterSpacing = (-0.3).sp
+                                )
+                            )
+                            Text(
+                                text = "Protect dynamic QR assets",
+                                style = TextStyle(
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            )
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
+                    // Description text (max 2 lines with 70% opacity)
                     Text(
-                        text = "Input row definitions in comma-separated structures (Title,Content,CampaignTag,SubFolder). Ideal for generating cards or coupons in automated batch operations.",
-                        color = Color.Gray,
+                        text = "Configure password protection and access controls.",
+                        color = Color.White.copy(alpha = 0.7f),
                         fontSize = 12.sp,
-                        lineHeight = 18.sp
+                        lineHeight = 16.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // Code editor layout
+                    // 4 Bullet Features listed cleanly
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "template.csv",
-                                fontFamily = FontFamily.Monospace,
-                                color = Color(0xFF64748B),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "UTF-8",
-                                fontFamily = FontFamily.Monospace,
-                                color = Color(0xFF64748B),
-                                fontSize = 10.sp
-                            )
-                        }
-
-                        OutlinedTextField(
-                            value = viewModel.csvInputText,
-                            onValueChange = { viewModel.csvInputText = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                                .testTag("csv_input_field"),
-                            textStyle = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            placeholder = {
-                                Text(
-                                    text = "Promo Badge,https://deal.co/badge1,Marketing,Sales",
-                                    fontFamily = FontFamily.Monospace,
-                                    color = Color(0xFF475569),
-                                    fontSize = 13.sp
-                                )
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    AdvancedPrimaryButton(
-                        text = "Generate batch",
-                        icon = Icons.Default.Check,
-                        onClick = { viewModel.processCsvBatchGeneration() }
-                    )
-
-                    if (viewModel.batchGenerateResultMsg.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = viewModel.batchGenerateResultMsg,
-                                fontFamily = FontFamily.Monospace,
-                                color = EmeraldPrime,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. Security tools Card Section
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, SlateBorder),
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    AdvancedSectionHeader(
-                        icon = Icons.Default.Lock,
-                        title = "Security Tools",
-                        subtitle = "Protected access and encrypted links",
-                        badgeText = "Protected",
-                        badgeColor = EmeraldPrime
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Test instant credentials decryption on secure codes set up with physical access blocks. Input standard passphrase to decrypt simulated database payloads.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = testPasswordText,
-                            onValueChange = { testPasswordText = it },
-                            placeholder = { Text("Input passcode (AccessGranted77)", fontSize = 13.sp) },
-                            singleLine = true,
-                            leadingIcon = { 
-                                Icon(
-                                    imageVector = Icons.Default.Lock, 
-                                    contentDescription = "Lock icon", 
-                                    tint = Color(0xFFD8B4FE), 
-                                    modifier = Modifier.size(18.dp)
-                                ) 
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0x33D8B4FE),
-                                unfocusedBorderColor = SlateBorder,
-                                focusedContainerColor = SlateDark,
-                                unfocusedContainerColor = SlateDark
-                            ),
-                            shape = RoundedCornerShape(14.dp)
-                        )
-
-                        Button(
-                            onClick = {
-                                if (testPasswordText == "AccessGranted77") {
-                                    revealedContentAlert = "SUCCESS: Decrypted payload revealed! Redirecting destination URL is: https://qrarc.co/deal-active"
-                                } else {
-                                    revealedContentAlert = "FAILED: Incorrect passcode verification! Connection rejected."
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFD8B4FE), // Filled lavender
-                                contentColor = Color(0xFF08080D)
-                            ),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.height(50.dp)
-                        ) {
-                            Text("Decrypt", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
-
-                    revealedContentAlert?.let { alert ->
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = alert,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
-                                color = if (alert.startsWith("SUCCESS")) EmeraldPrime else Color(0xFFEF4444),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4. API credentials Card Section
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, SlateBorder),
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    AdvancedSectionHeader(
-                        icon = Icons.Default.Key,
-                        title = "API Credentials",
-                        subtitle = "Manage tokens and secret scopes"
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "For development teams programmatically synchronizing dynamic QR campaigns. Rotate credentials workspace seeds to cycle tokens dynamically.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    OutlinedTextField(
-                        value = if (showApiKey) inputSecretKey else "sec_k_****************4183",
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.VpnKey, contentDescription = "Vpn key symbol", tint = Color(0xFFD8B4FE), modifier = Modifier.size(18.dp)) },
-                        trailingIcon = {
-                            IconButton(onClick = { showApiKey = !showApiKey }) {
-                                Icon(
-                                    imageVector = if (showApiKey) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (showApiKey) "Hide API Key" else "Show API Key",
-                                    tint = Color.Gray,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 13.sp,
-                            color = Color.White
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0x33D8B4FE),
-                            unfocusedBorderColor = SlateBorder,
-                            focusedContainerColor = Color(0xFF0F1020),
-                            unfocusedContainerColor = Color(0xFF0F1020)
-                        ),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        AdvancedSecondaryButton(
-                            text = "Copy key",
-                            icon = Icons.Default.ContentCopy,
-                            onClick = {
-                                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("API Key", inputSecretKey)
-                                clipboardManager.setPrimaryClip(clip)
-                                Toast.makeText(context, "Copied workspace token!", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        AdvancedPrimaryButton(
-                            text = "Rotate key",
-                            icon = Icons.Default.Refresh,
-                            onClick = {
-                                val keys = "sec_k_" + java.util.UUID.randomUUID().toString().replace("-", "").take(16)
-                                inputSecretKey = keys
-                                generatedApiAlertMsg = "Credentials seed rotated successfully! Active scopes: ['READ_ANALYTICS', 'PUT_REDIRECTS', 'WRITE_CODES']"
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0x0AFFFFFF), RoundedCornerShape(12.dp))
+                            .background(Color(0xFF0F1020), RoundedCornerShape(12.dp))
                             .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(12.dp))
                             .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Warning icon",
-                            tint = Color(0xFFEF4444).copy(alpha = 0.8f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "Treat this key like a password. Never share it in public code repositories.",
-                            color = Color.LightGray,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    generatedApiAlertMsg?.let { msg ->
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = msg,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
-                                color = EmeraldPrime,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 5. Team settings Card Section
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, SlateBorder),
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    AdvancedSectionHeader(
-                        icon = Icons.Default.People,
-                        title = "Team settings",
-                        subtitle = "Assign roles and collaborate with members",
-                        badgeText = "Beta",
-                        badgeColor = Color(0xFFD8B4FE)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Invite campaign coordinators, sales representatives, or marketing designers to generate and analyze dynamic QR triggers seamlessly.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(Color(0x14FFFFFF), CircleShape)
-                                    .border(BorderStroke(1.dp, Color(0x0AFFFFFF)), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("A", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("•", color = Color(0xFFD8B4FE), fontSize = 14.sp)
+                                    Text("Password protection", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("•", color = Color(0xFFD8B4FE), fontSize = 14.sp)
+                                    Text("Scan restrictions", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                                }
                             }
-                            Column {
-                                Text("Anand Kislay", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text("anandkislay1803@gmail.com", color = Color.Gray, fontSize = 11.sp)
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("•", color = Color(0xFFD8B4FE), fontSize = 14.sp)
+                                    Text("Expiration rules", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("•", color = Color(0xFFD8B4FE), fontSize = 14.sp)
+                                    Text("Secure access", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                                }
                             }
                         }
-                        Text("Owner", color = Color(0xFFD8B4FE), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    AdvancedSecondaryButton(
-                        text = "Invite team member",
-                        icon = Icons.Default.Add,
-                        onClick = {
-                            Toast.makeText(context, "Collaboration invites enabled on premium instances!", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                }
-            }
-        }
-
-        // 6. Developer utilities Card Section
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, SlateBorder),
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    AdvancedSectionHeader(
-                        icon = Icons.Default.Settings,
-                        title = "Developer utilities",
-                        subtitle = "Workspace diagnostic reports and telemetry logger"
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Manage local SDK telemetry diagnostic settings or flush localized offline records databases to perform clean instances setup operations.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Telemetry & analytics logging", color = Color.White, fontSize = 13.sp)
-                        var isTelemetryActive by remember { mutableStateOf(true) }
-                        Switch(
-                            checked = isTelemetryActive,
-                            onCheckedChange = { isTelemetryActive = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF08080D),
-                                checkedTrackColor = Color(0xFFD8B4FE),
-                                uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = SlateDark
-                            )
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    // Filled lavender button: 48px height, 14px border radius
+                    Button(
+                        onClick = {
+                            Toast.makeText(context, "Password protection suite loaded", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFD8B4FE),
+                            contentColor = Color(0xFF08080D)
+                        ),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        AdvancedSecondaryButton(
-                            text = "Download schema",
-                            icon = Icons.Default.Download,
+                        Text(
+                            text = "Manage Security",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section 3: Developer Tools Card
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    // Header Row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0x0AFFFFFF), CircleShape)
+                                .border(BorderStroke(1.dp, Color(0x14FFFFFF)), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Build,
+                                contentDescription = null,
+                                tint = Color(0xFFD8B4FE),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Developer Tools",
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    letterSpacing = (-0.3).sp
+                                )
+                            )
+                            Text(
+                                text = "Developer integrations and advanced resources",
+                                style = TextStyle(
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Description text (max 2 lines with 70% opacity)
+                    Text(
+                        text = "Access developer utilities and integration resources.",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Minimal Navigation List rows (Height 72px)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // Row 1: API Credentials
+                        DevToolRow(
+                            icon = Icons.Default.VpnKey,
+                            title = "API Credentials",
+                            subtitle = "Manage API keys securely",
                             onClick = {
-                                Toast.makeText(context, "JSON Schema download initiated!", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f)
+                                Toast.makeText(context, "API Credentials verified. raw keys are hidden for safety.", Toast.LENGTH_SHORT).show()
+                            }
                         )
 
-                        AdvancedSecondaryButton(
-                            text = "Clear cache",
-                            icon = Icons.Default.DeleteOutline,
-                            textColor = Color(0xFFEF4444), // Danger outline action
+                        // Row 2: Webhook Logs
+                        DevToolRow(
+                            icon = Icons.Default.Assignment,
+                            title = "Webhook Logs",
+                            subtitle = "View integration events",
                             onClick = {
-                                Toast.makeText(context, "Offline schema caches cleared!", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f)
+                                showWebhookLogs = !showWebhookLogs
+                                Toast.makeText(context, "Webhook logs " + (if (showWebhookLogs) "revealed" else "minimized") + " inside Automation card", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+
+                        // Row 3: Environment Variables
+                        DevToolRow(
+                            icon = Icons.Default.Settings,
+                            title = "Environment Variables",
+                            subtitle = "Configure workspace parameters",
+                            onClick = {
+                                Toast.makeText(context, "All configuration settings loaded securely via system build keys", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+
+                        // Row 4: Access Tokens
+                        DevToolRow(
+                            icon = Icons.Default.Security,
+                            title = "Access Tokens",
+                            subtitle = "Tokenized client access scopes",
+                            onClick = {
+                                Toast.makeText(context, "Access scopes active: ['READ_ANALYTICS', 'WRITE_CODES']", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+
+                        // Row 5: Brand Assets
+                        DevToolRow(
+                            icon = Icons.Default.Palette,
+                            title = "Brand Assets",
+                            subtitle = "Logos, typography and colors",
+                            onClick = {
+                                viewModel.setTab("brand")
+                            }
                         )
                     }
                 }
@@ -4659,6 +4319,73 @@ fun AdvancedSettingsWorkspace(
         item {
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+fun DevToolRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
+            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color(0xFFD8B4FE).copy(alpha = 0.08f), CircleShape)
+                    .border(BorderStroke(1.dp, Color(0xFFD8B4FE).copy(alpha = 0.15f)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color(0xFFD8B4FE),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Column {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = Color.Gray,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
@@ -5205,7 +4932,6 @@ fun QrBottomNavigation(
                     Icon(
                         imageVector = if (isSelected) item.second.second else item.second.third,
                         contentDescription = item.second.first,
-                        tint = if (isSelected) SlateDark else Color(0xFF94A3B8), // Premium Slate color for unselected icon
                         modifier = Modifier.size(28.dp) // Large premium icon size (increased to 28dp)
                     )
                 },
@@ -5213,15 +4939,16 @@ fun QrBottomNavigation(
                     Text(
                         text = item.second.first,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else Color(0xFF64748B), // Brighter white for active, soft slate for inactive
                         fontSize = 12.sp,
                         letterSpacing = 0.2.sp
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = Color(0xFFD8B4FE), // Beautiful rounded lavender/purple pill
-                    selectedIconColor = SlateDark,
-                    unselectedIconColor = Color(0xFF64748B)
+                    indicatorColor = Color(0xFFD8B4FE), // Lavender pill background
+                    selectedIconColor = SlateDark, // Dark contrast color for selected icon
+                    unselectedIconColor = Color(0xFF94A3B8), // Brighter unselected icon
+                    selectedTextColor = Color.White, // Brighter white text for active tab
+                    unselectedTextColor = Color(0xFF64748B) // Soft gray text for inactive tabs
                 )
             )
         }
