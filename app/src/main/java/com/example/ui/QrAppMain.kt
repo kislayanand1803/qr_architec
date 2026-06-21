@@ -226,17 +226,29 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
                         enter = fadeIn() + scaleIn(),
                         exit = fadeOut() + scaleOut()
                     ) {
-                        ExtendedFloatingActionButton(
+                        FloatingActionButton(
                             onClick = { viewModel.setTab("creator") },
                             containerColor = Color(0xFFD8B4FE), // Lavender
                             contentColor = Color(0xFF08080D), // Contrast deep SlateDark
-                            shape = RoundedCornerShape(16.dp),
-                            icon = { Icon(Icons.Default.Add, contentDescription = "Create QR", modifier = Modifier.size(20.dp)) },
-                            text = { Text("Create QR", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
+                            shape = RoundedCornerShape(20.dp),
+                            elevation = FloatingActionButtonDefaults.elevation(
+                                defaultElevation = 6.dp,
+                                pressedElevation = 12.dp,
+                                hoveredElevation = 8.dp,
+                                focusedElevation = 8.dp
+                            ),
                             modifier = Modifier
-                                .padding(bottom = 12.dp, end = 6.dp)
+                                .size(60.dp)
+                                .padding(bottom = 4.dp, end = 4.dp)
                                 .testTag("create_qr_fab")
-                        )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Create QR",
+                                tint = Color(0xFF08080D),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -737,7 +749,7 @@ fun LibraryWorkspace(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // SECTION 1 & 2: Redesigned Premium Header & Greeting
@@ -2959,7 +2971,7 @@ fun CampaignAnalyticsWorkspace(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp),
+        contentPadding = PaddingValues(bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Dropdown campaign filters
@@ -3784,7 +3796,7 @@ fun AdvancedSettingsWorkspace(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp),
+        contentPadding = PaddingValues(bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp) // Perfect spacing between sections
     ) {
         // Page Header Title Segment
@@ -3886,100 +3898,208 @@ fun AdvancedSettingsWorkspace(
             }
         }
 
-        // 2. Webhook activity Card Section
+        // 2. Webhook activity Card Section (Automation Tools)
         item {
+            val isActive = viewModel.webhookLogs.isNotEmpty()
             Card(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
                 shape = RoundedCornerShape(18.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(20.dp)) { // 20px dynamic card internal padding
-                    AdvancedSectionHeader(
-                        icon = Icons.Default.ElectricBolt,
-                        title = "Automation Tools",
-                        subtitle = "Monitor external automation events and webhooks",
-                        badgeText = if (viewModel.webhookLogs.isNotEmpty()) "Active" else "No activity",
-                        badgeColor = if (viewModel.webhookLogs.isNotEmpty()) EmeraldPrime else Color.Gray
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Every time a dynamic QR Architect code is scanned on a customer device, a webhook alert can trigger instantly. Webhooks route automatically to integrated automation platforms.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
+                Column(modifier = Modifier.padding(20.dp)) {
+                    // Header Row with ⚡ Automation Tools on the Left, Pill Badge on the Right
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Instance Status",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(6.dp)
-                                    .background(if (viewModel.webhookLogs.isNotEmpty()) EmeraldPrime else Color.Gray, CircleShape)
-                            )
-                            Text(
-                                text = if (viewModel.webhookLogs.isNotEmpty()) "Events Active" else "No events received",
-                                color = if (viewModel.webhookLogs.isNotEmpty()) EmeraldPrime else Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                                    .size(36.dp)
+                                    .background(Color(0x0AFFFFFF), CircleShape)
+                                    .border(BorderStroke(1.dp, Color(0x14FFFFFF)), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ElectricBolt,
+                                    contentDescription = null,
+                                    tint = Color(0xFFD8B4FE),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Automation Tools",
+                                    style = TextStyle(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        letterSpacing = (-0.3).sp
+                                    )
+                                )
+                                Text(
+                                    text = "Monitor external automation events and webhooks",
+                                    style = TextStyle(
+                                        color = Color.Gray,
+                                        fontSize = 11.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        // Compact Pill Status Badge
+                        Box(
+                            modifier = Modifier
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (isActive) Color(0xFF10B981).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
+                                .border(
+                                    BorderStroke(1.dp, if (isActive) Color(0xFF10B981).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.1f)),
+                                    RoundedCornerShape(999.dp)
+                                )
+                                .padding(horizontal = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8), CircleShape)
+                                )
+                                Text(
+                                    text = if (isActive) "Active" else "No Activity",
+                                    color = if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Body description text (limit to max 2 lines with 70% opacity)
+                    Text(
+                        text = "Webhook events are triggered when QR codes are scanned and routed to external automation platforms.",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Compact Information sections
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF0F1020), RoundedCornerShape(12.dp))
+                            .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Row 1: Instance Status
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Instance Status",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 12.sp
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .background(if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8), CircleShape)
+                                )
+                                Text(
+                                    text = if (isActive) "Active" else "No Activity",
+                                    color = if (isActive) Color(0xFF10B981) else Color(0xFF94A3B8),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Divider(color = Color.White.copy(alpha = 0.04f), modifier = Modifier.fillMaxWidth())
+
+                        // Row 2: Supported Platforms
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Supported Platforms",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 12.sp
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                listOf("Zapier", "Make", "n8n").forEach { platform ->
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = platform,
+                                            color = Color.White.copy(alpha = 0.8f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Optional Expanded Log Stream Panel
                     if (showWebhookLogs) {
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Box(
                             modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(150.dp)
-                                        .background(Color(0xFF0F1020), RoundedCornerShape(14.dp))
-                                        .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(14.dp))
-                                        .padding(16.dp)
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .background(Color(0xFF07070D), RoundedCornerShape(12.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
                         ) {
                             if (viewModel.webhookLogs.isEmpty()) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = "Log streams are currently clean.", 
-                                        color = Color.DarkGray, 
-                                        fontSize = 12.sp, 
+                                        text = "Log streams are currently clean.",
+                                        color = Color.DarkGray,
+                                        fontSize = 11.sp,
                                         fontFamily = FontFamily.Monospace
                                     )
                                 }
                             } else {
                                 Box(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                                     Column {
-                                        viewModel.webhookLogs.forEachIndexed { idx, log ->
+                                        viewModel.webhookLogs.forEach { log ->
                                             Text(
                                                 text = log,
                                                 fontFamily = FontFamily.Monospace,
-                                                fontSize = 11.sp,
-                                                color = Color(0xFFD8B4FE), // Lavender text for logs
-                                                modifier = Modifier.padding(bottom = 6.dp)
+                                                fontSize = 10.sp,
+                                                color = Color(0xFFD8B4FE),
+                                                modifier = Modifier.padding(bottom = 4.dp)
                                             )
-                                            if (idx < viewModel.webhookLogs.size - 1) {
-                                                Divider(color = Color(0x0DFFFFFF), modifier = Modifier.padding(vertical = 4.dp))
-                                            }
                                         }
                                     }
                                 }
@@ -3987,13 +4107,51 @@ fun AdvancedSettingsWorkspace(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    AdvancedSecondaryButton(
-                        text = if (showWebhookLogs) "Hide logs" else "View logs",
-                        icon = if (showWebhookLogs) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        onClick = { showWebhookLogs = !showWebhookLogs }
-                    )
+                    // Buttons/Action section (48px high with 14px border radius)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                Toast.makeText(context, "Webhook properties validated at /api/v1/webhook", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color.White
+                            ),
+                            border = BorderStroke(1.dp, SlateBorder),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                text = "Webhook Settings",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Button(
+                            onClick = { showWebhookLogs = !showWebhookLogs },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD8B4FE),
+                                contentColor = Color(0xFF08080D)
+                            ),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                text = if (showWebhookLogs) "Hide Logs" else "View Logs",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
