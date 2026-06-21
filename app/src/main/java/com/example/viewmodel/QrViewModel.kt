@@ -1,6 +1,7 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -60,6 +61,75 @@ class QrViewModel(application: Application) : AndroidViewModel(application) {
 
     // Selection management for bulk actions
     var selectedQrIds = mutableStateMapOf<Int, Boolean>()
+
+    // SharedPreferences persistence for announcements and favorited items
+    private val prefs = application.getSharedPreferences("qr_architect_prefs", Context.MODE_PRIVATE)
+
+    var showAnnouncement by mutableStateOf(prefs.getBoolean("show_announcement", true))
+        private set
+
+    fun dismissAnnouncement() {
+        showAnnouncement = false
+        prefs.edit().putBoolean("show_announcement", false).apply()
+    }
+
+    // Onboarding and What's New persistence
+    var userOnboarded by mutableStateOf(prefs.getBoolean("user_onboarded", false))
+        private set
+
+    var onboardingDismissed by mutableStateOf(prefs.getBoolean("onboarding_dismissed", false))
+        private set
+
+    var whatsNewDismissed by mutableStateOf(prefs.getBoolean("whats_new_dismissed", false))
+        private set
+
+    fun completeOnboarding() {
+        userOnboarded = true
+        prefs.edit().putBoolean("user_onboarded", true).apply()
+    }
+
+    fun dismissOnboarding() {
+        onboardingDismissed = true
+        prefs.edit().putBoolean("onboarding_dismissed", true).apply()
+    }
+
+    fun resetOnboarding() {
+        userOnboarded = false
+        onboardingDismissed = false
+        whatsNewDismissed = false
+        prefs.edit()
+            .putBoolean("user_onboarded", false)
+            .putBoolean("onboarding_dismissed", false)
+            .putBoolean("whats_new_dismissed", false)
+            .apply()
+    }
+
+    fun dismissWhatsNew() {
+        whatsNewDismissed = true
+        prefs.edit().putBoolean("whats_new_dismissed", true).apply()
+    }
+
+
+    // Favorites persistence
+    val favoriteQrIds = mutableStateMapOf<Int, Boolean>().apply {
+        val favs = prefs.getStringSet("favorites", emptySet()) ?: emptySet()
+        favs.forEach { idStr ->
+            idStr.toIntOrNull()?.let { id ->
+                put(id, true)
+            }
+        }
+    }
+
+    fun toggleFavorite(qrId: Int) {
+        val current = favoriteQrIds[qrId] ?: false
+        if (current) {
+            favoriteQrIds.remove(qrId)
+        } else {
+            favoriteQrIds[qrId] = true
+        }
+        val favsSet = favoriteQrIds.keys.map { it.toString() }.toSet()
+        prefs.edit().putStringSet("favorites", favsSet).apply()
+    }
 
     // Selected QR Code for Edit mode / Analytics details
     var selectedQrForDetail by mutableStateOf<QrCode?>(null)

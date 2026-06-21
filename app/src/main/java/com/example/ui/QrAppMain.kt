@@ -1,11 +1,13 @@
 package com.example.ui
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +15,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,6 +34,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -65,6 +72,11 @@ import android.net.Uri
 import java.io.OutputStream
 import java.io.File
 import java.io.FileOutputStream
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.lerp
+
+
 
 // Bento Grid Design Theme Colors (Elegant Dark Theme)
 val SlateDark = Color(0xFF08080D)     // #08080D - Deep dark space background
@@ -148,108 +160,382 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
     val qrList by viewModel.qrCodesState.collectAsState()
     val scanLogs by viewModel.scanLogsState.collectAsState()
 
+    // Splash Screen timing tracking state
+    var elapsedTime by remember { mutableStateOf(0) }
+    val isLibraryLoading = viewModel.isLibraryLoading
+
+    LaunchedEffect(isLibraryLoading) {
+        val fps = 60
+        val interval = 1000 / fps
+        while (elapsedTime < 2600) {
+            delay(interval.toLong())
+            if (elapsedTime < 2200) {
+                elapsedTime += interval
+                if (elapsedTime > 2200) elapsedTime = 2200
+            } else if (elapsedTime == 2200) {
+                if (!isLibraryLoading) {
+                    elapsedTime += interval
+                }
+            } else {
+                elapsedTime += interval
+            }
+        }
+    }
+
     // Walkthrough Onboarding State
-    var showOnboarding by remember { mutableStateOf(true) }
     var onboardingStep by remember { mutableIntStateOf(1) }
+    var activeWalkthrough by remember { mutableStateOf(false) }
 
     // Floating Interactive Detail Sidebar
     var activeDetailQr by remember { mutableStateOf<QrCode?>(null) }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = SlateDark,
-        bottomBar = {
-            QrBottomNavigation(
-                activeTab = viewModel.currentTab,
-                onTabSelected = { 
-                    viewModel.setTab(it)
-                    activeDetailQr = null
-                }
-            )
-        }
-    ) { innerPadding ->
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .windowInsetsPadding(WindowInsets.safeDrawing),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Main Content Stream
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(horizontal = 16.dp)
-            ) {
-                // Main Branded Navbar
-                BrandedHeader(
-                    onResetDemo = {
-                        Toast.makeText(context, "Demo presets restored in background database", Toast.LENGTH_SHORT).show()
-                    },
-                    showWalkthroughHelp = {
-                        onboardingStep = 1
-                        showOnboarding = true
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = SlateDark,
+            bottomBar = {
+                if (viewModel.currentTab == "library") {
+                    StaggeredEntrance(
+                        delayMs = 320,
+                        baseTime = 2200,
+                        currentTime = elapsedTime
+                    ) {
+                        QrBottomNavigation(
+                            activeTab = viewModel.currentTab,
+                            onTabSelected = { 
+                                viewModel.setTab(it)
+                                activeDetailQr = null
+                            }
+                        )
                     }
-                )
-
-                // Walkthrough HUD overlay
-                if (showOnboarding) {
-                    OnboardingWalkthroughHUD(
-                        step = onboardingStep,
-                        onNext = { if (onboardingStep < 4) onboardingStep++ else showOnboarding = false },
-                        onSkip = { showOnboarding = false }
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // Render respective tab workspace
-                when (viewModel.currentTab) {
-                    "library" -> LibraryWorkspace(
-                        qrList = qrList,
-                        viewModel = viewModel,
-                        onQrSelected = { activeDetailQr = it }
-                    )
-                    "creator" -> CreatorWorkshopWorkspace(
-                        viewModel = viewModel,
-                        onSaveClicked = {
-                            viewModel.saveQrRepresentation()
-                            Toast.makeText(context, "Successfully saved custom QR Architect!", Toast.LENGTH_SHORT).show()
+                } else {
+                    QrBottomNavigation(
+                        activeTab = viewModel.currentTab,
+                        onTabSelected = { 
+                            viewModel.setTab(it)
+                            activeDetailQr = null
                         }
                     )
-                    "analytics" -> CampaignAnalyticsWorkspace(
-                        qrList = qrList,
-                        scanLogs = scanLogs,
-                        viewModel = viewModel
-                    )
-                    "advanced" -> AdvancedSettingsWorkspace(
-                        viewModel = viewModel
-                    )
+                }
+            },
+            floatingActionButton = {
+                if (viewModel.currentTab != "creator") {
+                    val showFab = elapsedTime >= 2440
+                    AnimatedVisibility(
+                        visible = showFab,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut()
+                    ) {
+                        ExtendedFloatingActionButton(
+                            onClick = { viewModel.setTab("creator") },
+                            containerColor = Color(0xFFD8B4FE), // Lavender
+                            contentColor = Color(0xFF08080D), // Contrast deep SlateDark
+                            shape = RoundedCornerShape(16.dp),
+                            icon = { Icon(Icons.Default.Add, contentDescription = "Create QR", modifier = Modifier.size(20.dp)) },
+                            text = { Text("Create QR", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
+                            modifier = Modifier
+                                .padding(bottom = 12.dp, end = 6.dp)
+                                .testTag("create_qr_fab")
+                        )
+                    }
                 }
             }
-
-            // Quick Actions Detail Sidebar Drawer (Displays on right side if chosen)
-            AnimatedVisibility(
-                visible = activeDetailQr != null,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+        ) { innerPadding ->
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .windowInsetsPadding(WindowInsets.safeDrawing),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                activeDetailQr?.let { qr ->
-                    // Re-calculate referencing local list to keep live metrics accurate
-                    val latestQr = qrList.find { it.id == qr.id } ?: qr
-                    DetailActionsSidebar(
-                        qr = latestQr,
-                        allLogs = scanLogs.filter { it.qrId == qr.id },
-                        onDismiss = { activeDetailQr = null },
-                        viewModel = viewModel,
-                        onTriggerScanSimulation = {
-                            viewModel.registerSimulatedScan(qr.id)
-                            viewModel.fireWebhookSimulation(qr)
-                            Toast.makeText(context, "Scan simulation completed! Webhook fired [HTTP 200]!", Toast.LENGTH_SHORT).show()
+                // Main Content Stream
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    // Main Branded Navbar
+                    if (viewModel.currentTab != "library") {
+                        BrandedHeader(
+                            onResetDemo = {
+                                Toast.makeText(context, "Demo presets restored in background database", Toast.LENGTH_SHORT).show()
+                            },
+                            showWalkthroughHelp = {
+                                onboardingStep = 1
+                                activeWalkthrough = true
+                            }
+                        )
+                    }
+
+                    // Persistent Compact Onboarding Handler
+                    if (!viewModel.userOnboarded && !viewModel.onboardingDismissed && viewModel.currentTab != "library") {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 90.dp)
+                                .testTag("compact_onboarding_card"),
+                            colors = CardDefaults.cardColors(containerColor = SlateCard),
+                            border = BorderStroke(1.dp, SlateBorder),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(vertical = 10.dp, horizontal = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Welcome Icon",
+                                        tint = Color(0xFFD8B4FE),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "✨ Welcome to QR Architect",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(1.dp))
+                                        Text(
+                                            text = "Search, organize and manage your QR assets.",
+                                            color = Color.Gray,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextButton(
+                                        onClick = { 
+                                            onboardingStep = 1
+                                            activeWalkthrough = true
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFD8B4FE)),
+                                        modifier = Modifier.height(34.dp)
+                                    ) {
+                                        Text("Continue Setup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.dismissOnboarding() },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Dismiss",
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    } else if ((viewModel.userOnboarded || viewModel.onboardingDismissed) && !viewModel.whatsNewDismissed && viewModel.currentTab != "library") {
+                        var showWhatsNewDialog by remember { mutableStateOf(false) }
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 90.dp)
+                                .testTag("whats_new_card"),
+                            colors = CardDefaults.cardColors(containerColor = SlateCard),
+                            border = BorderStroke(1.dp, SlateBorder),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(vertical = 10.dp, horizontal = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.NewReleases,
+                                        contentDescription = "Updates Icon",
+                                        tint = Color(0xFFD8B4FE),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "✨ What's New",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(1.dp))
+                                        Text(
+                                            text = "Latest improvements and release notes.",
+                                            color = Color.Gray,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextButton(
+                                        onClick = { showWhatsNewDialog = true },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFD8B4FE)),
+                                        modifier = Modifier.height(34.dp)
+                                    ) {
+                                        Text("View Details", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.dismissWhatsNew() },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Dismiss Updates",
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        if (showWhatsNewDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showWhatsNewDialog = false },
+                                containerColor = SlateCard,
+                                title = {
+                                    Text("🚀 What's New in v2.4", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                },
+                                text = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Text(
+                                            text = "The QR Architect workspace has been upgraded with the following improvements:",
+                                            color = Color.LightGray,
+                                            fontSize = 13.sp
+                                        )
+                                        listOf(
+                                            "🎨 Premium Brand Assets redrawn to align with Cupertino & Linear visual designs.",
+                                            "⚙️ Brand identity accessible natively from the Advanced Developer screen.",
+                                            "🔍 Scalable vector rendering diagnostics for responsive high-contrast favicons.",
+                                            "⚡ Full client-side persistence for onboarding setup sequences."
+                                        ).forEach { update ->
+                                            Row(verticalAlignment = Alignment.Top) {
+                                                Text("• ", color = Color(0xFFD8B4FE), fontSize = 14.sp)
+                                                Text(update, color = Color.Gray, fontSize = 12.sp, lineHeight = 16.sp)
+                                            }
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = { showWhatsNewDialog = false }) {
+                                        Text("Dismiss", color = Color(0xFFD8B4FE), fontWeight = FontWeight.Bold)
+                                    }
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                                modifier = Modifier.border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(18.dp))
+                            )
+                        }
+                    }
+
+                    // Walkthrough HUD overlay
+                    if (activeWalkthrough && viewModel.currentTab != "library") {
+                        OnboardingWalkthroughHUD(
+                            step = onboardingStep,
+                            onNext = { 
+                                if (onboardingStep < 4) {
+                                    onboardingStep++
+                                } else {
+                                    activeWalkthrough = false
+                                    viewModel.completeOnboarding()
+                                }
+                            },
+                            onSkip = { 
+                                activeWalkthrough = false
+                                viewModel.completeOnboarding()
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    // Render respective tab workspace
+                    when (viewModel.currentTab) {
+                        "library" -> LibraryWorkspace(
+                            qrList = qrList,
+                            viewModel = viewModel,
+                            onQrSelected = { activeDetailQr = it },
+                            elapsedTime = elapsedTime
+                        )
+                        "creator" -> CreatorWorkshopWorkspace(
+                            viewModel = viewModel,
+                            onSaveClicked = {
+                                viewModel.saveQrRepresentation()
+                                Toast.makeText(context, "Successfully saved custom QR Architect!", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        "brand" -> BrandIdentityWorkspace(
+                            viewModel = viewModel
+                        )
+                        "analytics" -> CampaignAnalyticsWorkspace(
+                            qrList = qrList,
+                            scanLogs = scanLogs,
+                            viewModel = viewModel
+                        )
+                        "advanced" -> AdvancedSettingsWorkspace(
+                            viewModel = viewModel
+                        )
+                    }
+                }
+
+                // Quick Actions Detail Sidebar Drawer (Displays on right side if chosen)
+                AnimatedVisibility(
+                    visible = activeDetailQr != null,
+                    enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                    exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+                ) {
+                    activeDetailQr?.let { qr ->
+                        // Re-calculate referencing local list to keep live metrics accurate
+                        val latestQr = qrList.find { it.id == qr.id } ?: qr
+                        DetailActionsSidebar(
+                            qr = latestQr,
+                            allLogs = scanLogs.filter { it.qrId == qr.id },
+                            onDismiss = { activeDetailQr = null },
+                            viewModel = viewModel,
+                            onTriggerScanSimulation = {
+                                viewModel.registerSimulatedScan(qr.id)
+                                viewModel.fireWebhookSimulation(qr)
+                                Toast.makeText(context, "Scan simulation completed! Webhook fired [HTTP 200]!", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
                 }
             }
+        }
+
+        // Overlay the Premium Splash Screen if not fully completed
+        if (elapsedTime < 2600) {
+            PremiumSplashScreenOverlay(
+                elapsedTime = elapsedTime,
+                isLibraryLoading = isLibraryLoading
+            )
         }
     }
 }
@@ -259,7 +545,7 @@ fun BrandedHeader(onResetDemo: () -> Unit, showWalkthroughHelp: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 14.dp),
+            .padding(top = 22.dp, bottom = 12.dp, start = 6.dp, end = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -399,352 +685,1015 @@ fun OnboardingWalkthroughHUD(step: Int, onNext: () -> Unit, onSkip: () -> Unit) 
 fun LibraryWorkspace(
     qrList: List<QrCode>,
     viewModel: QrViewModel,
-    onQrSelected: (QrCode) -> Unit
+    onQrSelected: (QrCode) -> Unit,
+    elapsedTime: Int = 2600
 ) {
-    // Collect specific tags to populate tags filter list
-    val availableTags = qrList.mapNotNull { it.tag }.distinct()
+    val context = LocalContext.current
+    val scanLogs by viewModel.scanLogsState.collectAsState()
+    val availableTags = remember(qrList) {
+        qrList.mapNotNull { it.tag }.filter { it.isNotBlank() }.distinct()
+    }
 
     LaunchedEffect(viewModel.searchQuery, viewModel.selectedTypeFilter, viewModel.selectedTagFilter, viewModel.selectedSortOrder) {
         viewModel.triggerLibraryRefresh()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Group 1: Standalone clean search card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SlateCard),
-            border = BorderStroke(1.dp, SlateBorder)
-        ) {
-            OutlinedTextField(
-                value = viewModel.searchQuery,
-                onValueChange = { viewModel.searchQuery = it },
-                placeholder = { Text("Search QR codes by title or destination...", color = Color(0xFF938F99), fontSize = 13.sp) },
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search icon", tint = Color(0xFF938F99), modifier = Modifier.size(20.dp)) },
-                trailingIcon = {
-                    if (viewModel.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Color(0xFF938F99), modifier = Modifier.size(20.dp))
+    // State valuations at the proper @Composable context levels
+    val activeCount = remember(qrList) { qrList.count { it.isActive } }
+    
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val greeting = remember(hour) {
+        when (hour) {
+            in 0..11 -> "Good morning 👋"
+            in 12..16 -> "Good afternoon 👋"
+            else -> "Good evening 👋"
+        }
+    }
+
+    val favoritesList = remember(qrList, viewModel.favoriteQrIds) {
+        qrList.filter { viewModel.favoriteQrIds[it.id] == true }
+    }
+
+    val relevantLogs = remember(scanLogs, qrList) {
+        scanLogs.take(3)
+    }
+
+    // Filter & Sort list computation
+    val filteredList = remember(qrList, viewModel.searchQuery, viewModel.selectedTypeFilter, viewModel.selectedTagFilter, viewModel.selectedSortOrder) {
+        qrList.filter { qr ->
+            val matchQuery = qr.title.contains(viewModel.searchQuery, ignoreCase = true) || qr.content.contains(viewModel.searchQuery, ignoreCase = true)
+            val matchType = viewModel.selectedTypeFilter.isEmpty() || qr.type.equals(viewModel.selectedTypeFilter, ignoreCase = true)
+            val matchTag = viewModel.selectedTagFilter.isEmpty() || qr.tag == viewModel.selectedTagFilter
+            matchQuery && matchType && matchTag
+        }.sortedWith { q1, q2 ->
+            when (viewModel.selectedSortOrder) {
+                "DATE_ASC" -> q1.creationDate.compareTo(q2.creationDate)
+                "TITLE_ASC" -> q1.title.compareTo(q2.title, ignoreCase = true)
+                "SCANS_DESC" -> q2.scanCount.compareTo(q1.scanCount)
+                else -> q2.creationDate.compareTo(q1.creationDate) // DATE_DESC
+            }
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // SECTION 1 & 2: Redesigned Premium Header & Greeting
+        item {
+            StaggeredEntrance(
+                delayMs = 0,
+                baseTime = 2200,
+                currentTime = elapsedTime
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        if (elapsedTime >= 2600) {
+                                            Brush.linearGradient(listOf(Color(0xFFD8B4FE), Color(0xFFC084FC)))
+                                        } else {
+                                            Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (elapsedTime >= 2600) {
+                                    QrArchitectSymbol(
+                                        modifier = Modifier.size(28.dp),
+                                        primaryColor = Color(0xFF08080D)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    text = "QR Architect",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontFamily = FontFamily.SansSerif,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 25.sp,
+                                        color = Color.White,
+                                        letterSpacing = (-0.6).sp
+                                    )
+                                )
+                                Text(
+                                    text = "Developer platform & campaign tools",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = Color.Gray,
+                                        fontSize = 11.sp,
+                                        letterSpacing = 0.2.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                Toast.makeText(context, "Walkthrough guide simulation active!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .size(38.dp)
+                                .background(SlateCard, CircleShape)
+                                .border(BorderStroke(1.dp, SlateBorder), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.HelpOutline,
+                                contentDescription = "Help Guide",
+                                tint = Color(0xFFD8B4FE),
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .testTag("search_field"),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
-                ),
-                shape = RoundedCornerShape(16.dp)
-            )
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-        // Group 2: Categories Filter Section
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "ENCODING TYPE",
-                style = MaterialTheme.typography.labelSmall.copy(color = Color.Gray, fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val filterTypes = listOf("ALL", "URL", "WIFI", "VCARD", "TEXT")
-                filterTypes.forEach { type ->
-                    val isSelected = (type == "ALL" && viewModel.selectedTypeFilter.isEmpty()) || (type == viewModel.selectedTypeFilter)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.selectedTypeFilter = if (type == "ALL") "" else type },
-                        label = { Text(type, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = EmeraldPrime,
-                            selectedLabelColor = SlateDark,
-                            containerColor = SlateCard,
-                            labelColor = Color(0xFFCAC4D0)
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, borderColor = SlateBorder, selectedBorderColor = EmeraldPrime)
+                    Text(
+                        text = greeting,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        )
+                    )
+                    Text(
+                        text = "$activeCount active QR triggers",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color.Gray,
+                            fontSize = 13.sp
+                        )
                     )
                 }
             }
         }
 
-        if (availableTags.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Group 3: Campaigns & Tags Section
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "CAMPAIGNS & TAGS",
-                    style = MaterialTheme.typography.labelSmall.copy(color = Color.Gray, fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                    modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // SECTION 3: Collapsible Announcement Card
+        if (viewModel.showAnnouncement) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                    border = BorderStroke(1.dp, SlateBorder)
                 ) {
-                    val isAllTagsSelected = viewModel.selectedTagFilter.isEmpty()
-                    FilterChip(
-                        selected = isAllTagsSelected,
-                        onClick = { viewModel.selectedTagFilter = "" },
-                        label = { Text("ALL TAGS", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = EmeraldPrime,
-                            selectedLabelColor = SlateDark,
-                            containerColor = SlateCard,
-                            labelColor = Color(0xFFCAC4D0)
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isAllTagsSelected, borderColor = SlateBorder, selectedBorderColor = EmeraldPrime)
-                    )
-                    availableTags.forEach { tag ->
-                        val isSelected = viewModel.selectedTagFilter == tag
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { viewModel.selectedTagFilter = tag },
-                            label = { Text(tag.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = EmeraldPrime,
-                                selectedLabelColor = SlateDark,
-                                containerColor = SlateCard,
-                                labelColor = Color(0xFFCAC4D0)
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, borderColor = SlateBorder, selectedBorderColor = EmeraldPrime)
-                        )
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(Color(0x0EFFFFFF), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = "Magic info icon",
+                                    tint = Color(0xFFD8B4FE),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Welcome back",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                )
+                                Text(
+                                    text = "Search, organize and manage your dynamic QR campaigns programmatically.",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = Color.LightGray,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            TextButton(
+                                onClick = { viewModel.dismissAnnouncement() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.Gray)
+                            ) {
+                                Text("Dismiss", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    viewModel.setTab("creator")
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFD8B4FE),
+                                    contentColor = Color(0xFF08080D)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Continue Setup", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(12.dp))
 
-        // Bulk Actions Bar (displayed only when items are checked)
-        val selectedCount = viewModel.selectedQrIds.filter { it.value }.size
-        AnimatedVisibility(
-            visible = selectedCount > 0,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, EmeraldPrime)
+        // SECTION 4: Hero Search Bar
+        item {
+            StaggeredEntrance(
+                delayMs = 80,
+                baseTime = 2200,
+                currentTime = elapsedTime
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(16.dp), clip = true),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                    border = BorderStroke(1.dp, SlateBorder)
+                ) {
+                    OutlinedTextField(
+                        value = viewModel.searchQuery,
+                        onValueChange = { viewModel.searchQuery = it },
+                        placeholder = {
+                            Text(
+                                text = "Search QR codes, campaigns or destinations...",
+                                color = Color.Gray,
+                                fontSize = 13.sp
+                            )
+                        },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search icon",
+                                tint = Color.Gray,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (viewModel.searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear search",
+                                        tint = Color.Gray,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .testTag("search_field"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                }
+            }
+        }
+
+        // SECTION 5: Quick Stats
+        item {
+            StaggeredEntrance(
+                delayMs = 160,
+                baseTime = 2200,
+                currentTime = elapsedTime
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val campaignsCount = qrList.mapNotNull { it.tag }.filter { it.isNotBlank() }.distinct().size
+                    val totalScans = qrList.sumOf { it.scanCount }
+                    val recentLogsCount = scanLogs.size
+
+                    val stats = listOf(
+                        Triple("Active Codes", "$activeCount", Icons.Default.QrCode),
+                        Triple("Campaigns", "$campaignsCount", Icons.Default.Campaign),
+                        Triple("Scans Today", "${totalScans + 12}", Icons.Default.TrendingUp),
+                        Triple("Recent Activities", "$recentLogsCount", Icons.Default.History)
+                    )
+
+                    stats.forEach { stat ->
+                        Card(
+                            modifier = Modifier.width(130.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = SlateCard),
+                            border = BorderStroke(1.dp, SlateBorder)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = stat.first,
+                                        color = Color.Gray,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Icon(
+                                        imageVector = stat.third,
+                                        contentDescription = stat.first,
+                                        tint = Color(0xFFD8B4FE).copy(alpha = 0.7f),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stat.second,
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 18.sp
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 6: Encoding Type Horizontal Rows
+        item {
+            StaggeredEntrance(
+                delayMs = 240,
+                baseTime = 2200,
+                currentTime = elapsedTime
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                    Text(
+                        text = "Encoding type",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            color = Color.LightGray,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        ),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val filterTypes = listOf("ALL", "URL", "WIFI", "VCARD", "TEXT", "EMAIL", "PHONE")
+                        filterTypes.forEach { type ->
+                            val isSelected = (type == "ALL" && viewModel.selectedTypeFilter.isEmpty()) || (type == viewModel.selectedTypeFilter)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0xFFD8B4FE) else SlateCard)
+                                    .border(
+                                        BorderStroke(
+                                            1.dp,
+                                            if (isSelected) Color(0xFFD8B4FE) else SlateBorder
+                                        ),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { viewModel.selectedTypeFilter = if (type == "ALL") "" else type }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = type,
+                                    color = if (isSelected) Color(0xFF08080D) else Color.LightGray,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 7: Campaign Tags Horizontal Chips
+        if (availableTags.isNotEmpty()) {
+            item {
+                StaggeredEntrance(
+                    delayMs = 240,
+                    baseTime = 2200,
+                    currentTime = elapsedTime
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                        Text(
+                            text = "Campaign tags",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                color = Color.LightGray,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            ),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val isAllTagsSelected = viewModel.selectedTagFilter.isEmpty()
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isAllTagsSelected) Color(0xFFD8B4FE) else SlateCard)
+                                    .border(
+                                        BorderStroke(
+                                            1.dp,
+                                            if (isAllTagsSelected) Color(0xFFD8B4FE) else SlateBorder
+                                        ),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { viewModel.selectedTagFilter = "" }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "All Tags",
+                                    color = if (isAllTagsSelected) Color(0xFF08080D) else Color.LightGray,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            availableTags.forEach { tag ->
+                                val isSelected = viewModel.selectedTagFilter == tag
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0xFFD8B4FE) else SlateCard)
+                                        .border(
+                                            BorderStroke(
+                                                1.dp,
+                                                if (isSelected) Color(0xFFD8B4FE) else SlateBorder
+                                            ),
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { viewModel.selectedTagFilter = tag }
+                                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        color = if (isSelected) Color(0xFF08080D) else Color.LightGray,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 8: Favorites Section (horizontally scrolling)
+        if (favoritesList.isNotEmpty()) {
+            item {
+                StaggeredEntrance(
+                    delayMs = 240,
+                    baseTime = 2200,
+                    currentTime = elapsedTime
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Favorites",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Favorite active",
+                                tint = Color(0xFFD8B4FE),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            favoritesList.forEach { qr ->
+                                Card(
+                                    modifier = Modifier
+                                        .width(160.dp)
+                                        .clickable { onQrSelected(qr) },
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                                    border = BorderStroke(1.dp, Color(0xFFD8B4FE).copy(alpha = 0.2f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        val favBitmap = remember(qr) {
+                                            QrGenerator.generateQrBitmap(qr, 60).asImageBitmap()
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color.White)
+                                                .padding(2.dp)
+                                        ) {
+                                            Image(
+                                                bitmap = favBitmap,
+                                                contentDescription = qr.title,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = qr.title,
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = qr.type,
+                                                color = Color.Gray,
+                                                fontSize = 9.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 9: Sort and Filter Bar
+        item {
+            StaggeredEntrance(
+                delayMs = 240,
+                baseTime = 2200,
+                currentTime = elapsedTime
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "$selectedCount selected items",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = IndigoAccent, fontWeight = FontWeight.Bold)
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(
-                            onClick = { viewModel.bulkToggleActive(true) },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(SlateDark, RoundedCornerShape(6.dp))
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Active selection", tint = EmeraldPrime, modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(
-                            onClick = { viewModel.bulkToggleActive(false) },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(SlateDark, RoundedCornerShape(6.dp))
-                        ) {
-                            Icon(Icons.Default.Pause, contentDescription = "Pause selection", tint = Color.Yellow, modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(
-                            onClick = { viewModel.bulkDelete() },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(SlateDark, RoundedCornerShape(6.dp)),
-                            colors = IconButtonDefaults.iconButtonColors(contentColor = Color.Red)
-                        ) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete selection", tint = Color.Red, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        // Filter & Sort list computation
-        val filteredList = remember(qrList, viewModel.searchQuery, viewModel.selectedTypeFilter, viewModel.selectedTagFilter, viewModel.selectedSortOrder) {
-            qrList.filter { qr ->
-                val matchQuery = qr.title.contains(viewModel.searchQuery, ignoreCase = true) || qr.content.contains(viewModel.searchQuery, ignoreCase = true)
-                val matchType = viewModel.selectedTypeFilter.isEmpty() || qr.type.equals(viewModel.selectedTypeFilter, ignoreCase = true)
-                val matchTag = viewModel.selectedTagFilter.isEmpty() || qr.tag == viewModel.selectedTagFilter
-                matchQuery && matchType && matchTag
-            }.sortedWith { q1, q2 ->
-                when (viewModel.selectedSortOrder) {
-                    "DATE_ASC" -> q1.creationDate.compareTo(q2.creationDate)
-                    "TITLE_ASC" -> q1.title.compareTo(q2.title, ignoreCase = true)
-                    "SCANS_DESC" -> q2.scanCount.compareTo(q1.scanCount)
-                    else -> q2.creationDate.compareTo(q1.creationDate) // DATE_DESC
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Smaller Informational Card showing active code count with light indicator dot
-            Card(
-                shape = RoundedCornerShape(10.dp),
-                colors = CardDefaults.cardColors(containerColor = SlateCard),
-                border = BorderStroke(1.dp, SlateBorder)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(EmeraldPrime, CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "${filteredList.size} codes active",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        text = "${filteredList.size} Active Codes",
+                        style = MaterialTheme.typography.titleSmall.copy(
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 14.sp
                         )
                     )
-                }
-            }
 
-            // Sorting order pill
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clickable {
-                        viewModel.selectedSortOrder = when (viewModel.selectedSortOrder) {
-                            "DATE_DESC" -> "DATE_ASC"
-                            "DATE_ASC" -> "TITLE_ASC"
-                            "TITLE_ASC" -> "SCANS_DESC"
-                            else -> "DATE_DESC"
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Sort drop button trigger
+                        Row(
+                            modifier = Modifier
+                                .clickable {
+                                    viewModel.selectedSortOrder = when (viewModel.selectedSortOrder) {
+                                        "DATE_DESC" -> "DATE_ASC"
+                                        "DATE_ASC" -> "TITLE_ASC"
+                                        "TITLE_ASC" -> "SCANS_DESC"
+                                        else -> "DATE_DESC"
+                                    }
+                                }
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SlateCard)
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = when (viewModel.selectedSortOrder) {
+                                    "DATE_ASC" -> "Oldest"
+                                    "TITLE_ASC" -> "A - Z Index"
+                                    "SCANS_DESC" -> "Popularity"
+                                    else -> "Newest"
+                                },
+                                color = Color.LightGray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Sort,
+                                contentDescription = "Sort Trigger icon",
+                                tint = Color(0xFFD8B4FE),
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+
+                        // Filter cog icon
+                        IconButton(
+                            onClick = {
+                                viewModel.selectedTypeFilter = ""
+                                viewModel.selectedTagFilter = ""
+                                Toast.makeText(context, "Search constraints reset!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(SlateCard, RoundedCornerShape(10.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(10.dp))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings resetting gears",
+                                tint = Color.LightGray,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
-                    .background(SlateCard, RoundedCornerShape(10.dp))
-                    .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Sort,
-                    contentDescription = "Sort Icon",
-                    tint = EmeraldPrime,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = when (viewModel.selectedSortOrder) {
-                        "DATE_ASC" -> "Date (Oldest)"
-                        "TITLE_ASC" -> "A - Z Alphabet"
-                        "SCANS_DESC" -> "Popularity"
-                        else -> "Date (Newest)"
-                    },
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = IndigoAccent,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                )
+                }
             }
         }
 
-        val slateShimmerBrush = shimmerBrush()
-
-        // Empty/Loading Library check
+        // SECTION 10: The QR Codes Grid
         if (viewModel.isLibraryLoading) {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 160.dp),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(6) {
-                    QrCodeSkeletonCard(shimmerBrush = slateShimmerBrush)
+            items(3) {
+                StaggeredEntrance(
+                    delayMs = 240,
+                    baseTime = 2200,
+                    currentTime = elapsedTime
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            QrCodeSkeletonCard(shimmerBrush = shimmerBrush())
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            QrCodeSkeletonCard(shimmerBrush = shimmerBrush())
+                        }
+                    }
                 }
             }
         } else if (filteredList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.QrCode,
-                        contentDescription = "Empty Library indicator",
-                        tint = SlateBorder,
-                        modifier = Modifier.size(80.dp)
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = "No codes found matching current search terms.",
-                        style = MaterialTheme.typography.bodyLarge.copy(color = IndigoAccent, fontWeight = FontWeight.SemiBold),
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Clear search fields or navigate to 'Creator' to build a custom QR code instantly.",
-                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFCAC4D0)),
-                        textAlign = TextAlign.Center
-                    )
+            item {
+                StaggeredEntrance(
+                    delayMs = 240,
+                    baseTime = 2200,
+                    currentTime = elapsedTime
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 40.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .background(SlateCard, CircleShape)
+                                .border(BorderStroke(1.dp, SlateBorder), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCode,
+                                contentDescription = "Empty list",
+                                tint = Color.DarkGray,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "No QR codes yet",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Create your first dynamic QR code to launch.",
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.setTab("creator") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD8B4FE),
+                                contentColor = Color(0xFF08080D)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text("Create QR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
                 }
             }
         } else {
-            // LazyVerticalGrid for beautiful SaaS items cataloging!
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 160.dp),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filteredList, key = { it.id }) { qr ->
-                    QrCodeCatalogCard(
-                        qr = qr,
-                        isSelected = viewModel.selectedQrIds[qr.id] ?: false,
-                        onSelectedChange = { checked ->
-                            viewModel.selectedQrIds[qr.id] = checked
-                        },
-                        onTap = { onQrSelected(qr) },
-                        viewModel = viewModel
-                    )
+            val chunkedList = filteredList.chunked(2)
+            chunkedList.forEach { rowItems ->
+                item {
+                    StaggeredEntrance(
+                        delayMs = 240,
+                        baseTime = 2200,
+                        currentTime = elapsedTime
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            rowItems.forEach { qr ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    SwipeableQrCardContainer(
+                                        onSwipeRight = {
+                                            viewModel.toggleFavorite(qr.id)
+                                            Toast.makeText(context, if (viewModel.favoriteQrIds[qr.id] == true) "Pinned ${qr.title}!" else "Unpinned ${qr.title}!", Toast.LENGTH_SHORT).show()
+                                        },
+                                        onSwipeLeft = {
+                                            viewModel.deleteQr(qr)
+                                            Toast.makeText(context, "Deleted ${qr.title}!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) {
+                                        QrCodeCatalogCard(
+                                            qr = qr,
+                                            isSelected = viewModel.selectedQrIds[qr.id] ?: false,
+                                            onSelectedChange = { checked ->
+                                                viewModel.selectedQrIds[qr.id] = checked
+                                            },
+                                            onTap = { onQrSelected(qr) },
+                                            viewModel = viewModel
+                                        )
+                                    }
+                                }
+                            }
+                            if (rowItems.size < 2) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
                 }
             }
+        }
+
+        // SECTION 11: Recent Activity
+        item {
+            StaggeredEntrance(
+                delayMs = 320,
+                baseTime = 2200,
+                currentTime = elapsedTime
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(top = 16.dp)) {
+                    Text(
+                        text = "Recent Activity",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        ),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    if (relevantLogs.isNotEmpty()) {
+                        relevantLogs.forEach { log ->
+                            val matchingTitle = remember(qrList) {
+                                qrList.find { it.id == log.qrId }?.title ?: "Campaign QR"
+                            }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                                border = BorderStroke(1.dp, SlateBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(Color(0x06FFFFFF), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.TrendingUp,
+                                                contentDescription = "Event trigger icon",
+                                                tint = Color(0xFFD8B4FE),
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                        }
+                                        Column {
+                                            Text(
+                                                text = "$matchingTitle scanned",
+                                                color = Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = "OS: ${log.deviceOS} | IP: ${log.ipAddress}",
+                                                color = Color.Gray,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        text = formatTimeAgo(log.timestamp),
+                                        color = Color.LightGray,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Seed recent updates as dynamic activities
+                        val staticRecentItems = listOf(
+                            Pair("Marketing Card scanned", "2 minutes ago"),
+                            Pair("HR Badge updated", "1 hour ago"),
+                            Pair("WiFi QR created", "Yesterday")
+                        )
+
+                        staticRecentItems.forEach { item ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                                border = BorderStroke(1.dp, SlateBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(Color(0x06FFFFFF), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.TrendingUp,
+                                                contentDescription = null,
+                                                tint = Color(0xFFD8B4FE),
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = item.first,
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+
+                                    Text(
+                                        text = item.second,
+                                        color = Color.LightGray,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun formatTimeAgo(timeMs: Long): String {
+    val diff = System.currentTimeMillis() - timeMs
+    return when {
+        diff < 60_000 -> "just now"
+        diff < 3600_000 -> "${diff / 60_000}m ago"
+        diff < 86400_000 -> "${diff / 3600_000}h ago"
+        else -> "${diff / 86400_000}d ago"
+    }
+}
+
+@Composable
+fun SwipeableQrCardContainer(
+    onSwipeRight: () -> Unit,
+    onSwipeLeft: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    var offsetX by remember { mutableStateOf(0f) }
+    val animatedOffset by animateFloatAsState(
+        targetValue = offsetX,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+    )
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(SlateCard)
+    ) {
+        if (offsetX > 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFD8B4FE).copy(alpha = 0.15f))
+                    .padding(start = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color(0xFFD8B4FE), modifier = Modifier.size(16.dp))
+                    Text("Pin Favorite", color = Color(0xFFD8B4FE), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        } else if (offsetX < 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFEF4444).copy(alpha = 0.15f))
+                    .padding(end = 14.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Delete Code", color = Color(0xFFEF4444), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(animatedOffset.roundToInt(), 0) }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (offsetX > 140) {
+                                onSwipeRight()
+                            } else if (offsetX < -140) {
+                                onSwipeLeft()
+                            }
+                            offsetX = 0f
+                        },
+                        onDragCancel = {
+                            offsetX = 0f
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            offsetX = (offsetX + dragAmount).coerceIn(-200f, 200f)
+                        }
+                    )
+                }
+        ) {
+            content()
         }
     }
 }
@@ -757,9 +1706,30 @@ fun QrCodeCatalogCard(
     onTap: () -> Unit,
     viewModel: QrViewModel
 ) {
-    // Cache the bitmap generation so scrolling stays ultra smooth
+    val context = LocalContext.current
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    val isFavorited = viewModel.favoriteQrIds[qr.id] == true
+
     val qrImageBitmap = remember(qr) {
         QrGenerator.generateQrBitmap(qr, 180).asImageBitmap()
+    }
+
+    val timeLabel = remember(qr.creationDate) {
+        val diff = System.currentTimeMillis() - qr.creationDate
+        when {
+            diff < 15 * 60 * 1000 -> "Updated now"
+            diff < 24 * 60 * 60 * 1000 -> "Updated today"
+            diff < 48 * 60 * 60 * 1000 -> "Created yesterday"
+            else -> {
+                val sdf = SimpleDateFormat("MMM d", Locale.getDefault())
+                "Created " + sdf.format(Date(qr.creationDate))
+            }
+        }
+    }
+
+    val displayUrl = remember(qr.content) {
+        qr.content.replace("https://", "").replace("http://", "").replace("www.", "").take(22) + 
+            if (qr.content.length > 22) "..." else ""
     }
 
     Card(
@@ -772,127 +1742,208 @@ fun QrCodeCatalogCard(
         ),
         border = BorderStroke(
             1.dp,
-            if (isSelected) EmeraldPrime else SlateBorder
+            if (isSelected) Color(0xFFD8B4FE) else SlateBorder
         ),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Checkbox and Badge layout
+            // First Row: SelectCheckbox and Pin Indicator, and⋮ Menu Trigger
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = onSelectedChange,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = EmeraldPrime,
-                        uncheckedColor = Color.Gray
-                    ),
-                    modifier = Modifier.size(24.dp)
-                )
-
-                // Render micro status badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (qr.isActive) EmeraldPrime.copy(alpha = 0.15f) else Color(0xFFCAC4D0))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = if (qr.isActive) "ACTIVE" else "PAUSED",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = if (qr.isActive) EmeraldPrime else Color(0xFF938F99),
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = onSelectedChange,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color(0xFFD8B4FE),
+                            uncheckedColor = Color.Gray,
+                            checkmarkColor = SlateDark
+                        ),
+                        modifier = Modifier.size(24.dp)
                     )
+
+                    if (isFavorited) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Pinned favorite",
+                            tint = Color(0xFFD8B4FE),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Box {
+                    IconButton(
+                        onClick = { isMenuExpanded = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Quick Actions Menu",
+                            tint = Color.Gray
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false },
+                        modifier = Modifier.background(SlateCard).border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(8.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit", color = Color.White) },
+                            onClick = {
+                                isMenuExpanded = false
+                                viewModel.loadForEditing(qr)
+                                viewModel.setTab("creator")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Duplicate", color = Color.White) },
+                            onClick = {
+                                isMenuExpanded = false
+                                viewModel.duplicateQr(qr)
+                                Toast.makeText(context, "Duplicated code copied safely!", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share", color = Color.White) },
+                            onClick = {
+                                isMenuExpanded = false
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, qr.title)
+                                    putExtra(Intent.EXTRA_TEXT, qr.content)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share QR Code info"))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Analytics", color = Color.White) },
+                            onClick = {
+                                isMenuExpanded = false
+                                viewModel.selectQrForDetail(qr)
+                                viewModel.setTab("analytics")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = Color.Red) },
+                            onClick = {
+                                isMenuExpanded = false
+                                viewModel.deleteQr(qr)
+                                Toast.makeText(context, "Code removed", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Centered High-Fidelity QR image
+            // Centered QR Code Preview
             Box(
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(120.dp)
                     .align(Alignment.CenterHorizontally)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.White)
-                    .padding(6.dp)
+                    .padding(8.dp)
             ) {
                 Image(
                     bitmap = qrImageBitmap,
-                    contentDescription = "QR Code thumbnail",
+                    contentDescription = "QR preview representation",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Metadata info
+            // Title and Shortened URL
             Text(
                 text = qr.title,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = IndigoAccent,
+                    color = Color.White,
                     fontWeight = FontWeight.Bold
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
+            Text(
+                text = if (qr.type.equals("WIFI", ignoreCase = true)) "Wi-Fi Config" else displayUrl,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = Color.Gray,
+                    fontSize = 11.sp
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Scans and updated date row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.TrendingUp,
+                        contentDescription = "Scan count indicator",
+                        tint = if (qr.isActive) Color(0xFFD8B4FE) else Color.Gray,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = "${qr.scanCount} scans",
+                        color = if (qr.isActive) Color.White else Color.Gray,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Text(
+                    text = timeLabel,
+                    color = Color.Gray,
+                    fontSize = 9.sp,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Micro Status badge and Type Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Type label text with micro indicator
-                Text(
-                    text = qr.type,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = Color(0xFFCAC4D0),
-                        fontSize = 11.sp
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(if (qr.isActive) Color(0xFFD8B4FE) else Color.Gray, CircleShape)
                     )
-                )
-
-                // Metric total count
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.TrendingUp,
-                        contentDescription = "Scan count icon",
-                        tint = if (qr.scanCount > 10) EmeraldPrime else Color.Gray,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(2.dp))
                     Text(
-                        text = "${qr.scanCount} scans",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = if (qr.scanCount > 10) IndigoAccent else Color(0xFFCAC4D0),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        text = if (qr.isActive) "Active" else "Paused",
+                        color = if (qr.isActive) Color(0xFFD8B4FE) else Color.Gray,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-            }
 
-            if (!qr.tag.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                // Tag small indicator pill
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(IndigoAccent.copy(alpha = 0.25f))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x0CFFFFFF))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = qr.tag.uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = IndigoAccent,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        text = qr.type,
+                        color = Color.LightGray,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -941,7 +1992,7 @@ fun QrCodeSkeletonCard(shimmerBrush: Brush) {
             .testTag("qr_skeleton_card"),
         colors = CardDefaults.cardColors(containerColor = SlateCard),
         border = BorderStroke(1.dp, SlateBorder),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -999,14 +2050,6 @@ fun QrCodeSkeletonCard(shimmerBrush: Brush) {
                         .background(shimmerBrush)
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .width(60.dp)
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(shimmerBrush)
-            )
         }
     }
 }
@@ -2774,13 +3817,88 @@ fun AdvancedSettingsWorkspace(
                 colors = CardDefaults.cardColors(containerColor = SlateCard),
                 border = BorderStroke(1.dp, SlateBorder),
                 shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth().testTag("advanced_brand_identity_card")
+            ) {
+                Row(
+                    modifier = Modifier.clickable { viewModel.setTab("brand") }.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color(0xFFD8B4FE).copy(alpha = 0.1f), CircleShape)
+                                .border(BorderStroke(1.dp, Color(0xFFD8B4FE).copy(alpha = 0.25f)), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = "Brand Identity Palette Icon",
+                                tint = Color(0xFFD8B4FE),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "Brand Assets",
+                                    style = TextStyle(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        letterSpacing = (-0.3).sp
+                                    )
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFD8B4FE).copy(alpha = 0.15f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("WORKSPACE", color = Color(0xFFD8B4FE), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Logos, colors, typography and design resources",
+                                style = TextStyle(
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                )
+                            )
+                        }
+                    }
+                    
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Expand brand assets",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        // 2. Webhook activity Card Section
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(18.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) { // 20px dynamic card internal padding
                     AdvancedSectionHeader(
                         icon = Icons.Default.ElectricBolt,
-                        title = "Webhook activity",
-                        subtitle = "Monitor external automation events",
+                        title = "Automation Tools",
+                        subtitle = "Monitor external automation events and webhooks",
                         badgeText = if (viewModel.webhookLogs.isNotEmpty()) "Active" else "No activity",
                         badgeColor = if (viewModel.webhookLogs.isNotEmpty()) EmeraldPrime else Color.Gray
                     )
@@ -2891,7 +4009,7 @@ fun AdvancedSettingsWorkspace(
                 Column(modifier = Modifier.padding(20.dp)) {
                     AdvancedSectionHeader(
                         icon = Icons.Default.Description,
-                        title = "Batch generator",
+                        title = "Automation Tools: Batch Generator",
                         subtitle = "Generate QR cards from CSV templates"
                     )
 
@@ -3008,7 +4126,7 @@ fun AdvancedSettingsWorkspace(
                 Column(modifier = Modifier.padding(20.dp)) {
                     AdvancedSectionHeader(
                         icon = Icons.Default.Lock,
-                        title = "Security tools",
+                        title = "Security Tools",
                         subtitle = "Protected access and encrypted links",
                         badgeText = "Protected",
                         badgeColor = EmeraldPrime
@@ -3109,7 +4227,7 @@ fun AdvancedSettingsWorkspace(
                 Column(modifier = Modifier.padding(20.dp)) {
                     AdvancedSectionHeader(
                         icon = Icons.Default.Key,
-                        title = "API credentials",
+                        title = "API Credentials",
                         subtitle = "Manage tokens and secret scopes"
                     )
 
@@ -3903,7 +5021,7 @@ fun QrBottomNavigation(
             .windowInsetsPadding(WindowInsets.navigationBars)
             .height(82.dp) // Generous height for premium spacing
             .shadow(
-                elevation = 12.dp,
+                elevation = 16.dp,
                 shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
                 clip = false
             )
@@ -3921,7 +5039,7 @@ fun QrBottomNavigation(
         )
 
         items.forEach { item ->
-            val isSelected = activeTab == item.first
+            val isSelected = activeTab == item.first || (item.first == "advanced" && activeTab == "brand")
             NavigationBarItem(
                 selected = isSelected,
                 onClick = { onTabSelected(item.first) },
@@ -3930,7 +5048,7 @@ fun QrBottomNavigation(
                         imageVector = if (isSelected) item.second.second else item.second.third,
                         contentDescription = item.second.first,
                         tint = if (isSelected) SlateDark else Color(0xFF94A3B8), // Premium Slate color for unselected icon
-                        modifier = Modifier.size(26.dp) // Large premium icon size
+                        modifier = Modifier.size(28.dp) // Large premium icon size (increased to 28dp)
                     )
                 },
                 label = {
@@ -3958,3 +5076,1797 @@ fun SlateLightBorder(): Color = SlateBorder.copy(alpha = 0.5f)
 
 @Composable
 fun Modifier.fillPadding(): Modifier = this.padding(vertical = 4.dp)
+
+// ==========================================
+// BRAND IDENTITY SYSTEM - QR ARCHITECT BRAND WORKSPACE
+// ==========================================
+
+@Composable
+fun QrArchitectSymbol(
+    modifier: Modifier = Modifier,
+    primaryColor: Color = Color(0xFFD8B4FE),
+    showGuides: Boolean = false,
+    guideColor: Color = Color(0xFFD8B4FE).copy(alpha = 0.35f)
+) {
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val sizeMin = minOf(width, height)
+        val scale = sizeMin / 100f
+        
+        // Render technical grids when blueprint mode is on
+        if (showGuides) {
+            // Precise crosshair alignments
+            drawLine(
+                color = guideColor.copy(alpha = 0.25f),
+                start = Offset(50f * scale, 1f * scale),
+                end = Offset(50f * scale, 99f * scale),
+                strokeWidth = 0.75f * scale,
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4f * scale, 4f * scale), 0f)
+            )
+            drawLine(
+                color = guideColor.copy(alpha = 0.25f),
+                start = Offset(1f * scale, 50f * scale),
+                end = Offset(99f * scale, 50f * scale),
+                strokeWidth = 0.75f * scale,
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4f * scale, 4f * scale), 0f)
+            )
+
+            // Inner drafting radius circles
+            drawCircle(
+                color = guideColor.copy(alpha = 0.12f),
+                radius = 45f * scale,
+                center = Offset(50f * scale, 50f * scale),
+                style = Stroke(width = 1f * scale)
+            )
+            drawCircle(
+                color = guideColor.copy(alpha = 0.08f),
+                radius = 25f * scale,
+                center = Offset(50f * scale, 50f * scale),
+                style = Stroke(width = 1f * scale)
+            )
+            
+            // Grid-level division ticks
+            val alignments = listOf(15f, 34f, 49f, 57f, 73f, 85f)
+            alignments.forEach { pos ->
+                drawLine(
+                    color = guideColor.copy(alpha = 0.10f),
+                    start = Offset(0f, pos * scale),
+                    end = Offset(width, pos * scale),
+                    strokeWidth = 0.5f * scale
+                )
+                drawLine(
+                    color = guideColor.copy(alpha = 0.10f),
+                    start = Offset(pos * scale, 0f),
+                    end = Offset(pos * scale, height),
+                    strokeWidth = 0.5f * scale
+                )
+            }
+        }
+        
+        // --- DRAW MODULE 1 (TOP-LEFT): Outer Finder rounded square frame ---
+        val outerStrokeWidth = 6f * scale
+        val outerSizeLength = 34f * scale
+        val outerCornerRadius = 8f * scale
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(15f * scale, 15f * scale),
+            size = Size(outerSizeLength, outerSizeLength),
+            cornerRadius = CornerRadius(outerCornerRadius, outerCornerRadius),
+            style = Stroke(width = outerStrokeWidth)
+        )
+        
+        // --- DRAW MODULE 2 (TOP-LEFT): Inner Solid square finder node ---
+        val innerSizeLength = 14f * scale
+        val innerCornerRadius = 3f * scale
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(25f * scale, 25f * scale),
+            size = Size(innerSizeLength, innerSizeLength),
+            cornerRadius = CornerRadius(innerCornerRadius, innerCornerRadius)
+        )
+        
+        // --- DRAW MODULE 3 (TOP-RIGHT): Beam architectures ---
+        // Upper long beam
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(57f * scale, 15f * scale),
+            size = Size(28f * scale, 8f * scale),
+            cornerRadius = CornerRadius(3.5f * scale, 3.5f * scale)
+        )
+        // Lower shorter alignment offset block
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(57f * scale, 27f * scale),
+            size = Size(18f * scale, 8f * scale),
+            cornerRadius = CornerRadius(3.5f * scale, 3.5f * scale)
+        )
+        // Anchor beacon block
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(79f * scale, 27f * scale),
+            size = Size(6f * scale, 8f * scale),
+            cornerRadius = CornerRadius(2.5f * scale, 2.5f * scale)
+        )
+        
+        // --- DRAW MODULE 4 (BOTTOM-LEFT): Vertical structural pillars ---
+        // Long vertical support column
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(15f * scale, 57f * scale),
+            size = Size(8f * scale, 28f * scale),
+            cornerRadius = CornerRadius(3.5f * scale, 3.5f * scale)
+        )
+        // Secondary offset pillar
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(27f * scale, 57f * scale),
+            size = Size(8f * scale, 18f * scale),
+            cornerRadius = CornerRadius(3.5f * scale, 3.5f * scale)
+        )
+        // Small base foundation block
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(27f * scale, 79f * scale),
+            size = Size(8f * scale, 6f * scale),
+            cornerRadius = CornerRadius(2.5f * scale, 2.5f * scale)
+        )
+        
+        // --- DRAW MODULE 5 (BOTTOM-RIGHT): 2x2 cluster of precision nodes ---
+        // Top-left precision module
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(57f * scale, 57f * scale),
+            size = Size(11f * scale, 11f * scale),
+            cornerRadius = CornerRadius(3f * scale, 3f * scale)
+        )
+        // Top-right architectural outline node
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(73f * scale, 57f * scale),
+            size = Size(11f * scale, 11f * scale),
+            cornerRadius = CornerRadius(3f * scale, 3f * scale),
+            style = Stroke(width = 3.5f * scale)
+        )
+        // Bottom-left architectural outline node
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(57f * scale, 73f * scale),
+            size = Size(11f * scale, 11f * scale),
+            cornerRadius = CornerRadius(3f * scale, 3f * scale),
+            style = Stroke(width = 3.5f * scale)
+        )
+        // Bottom-right terminal anchor module
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(73f * scale, 73f * scale),
+            size = Size(11f * scale, 11f * scale),
+            cornerRadius = CornerRadius(3f * scale, 3f * scale)
+        )
+        
+        // Blueprint precision corner drafting tick marks
+        if (showGuides) {
+            val tick = 4f * scale
+            // Top-left draft corner ticks
+            drawLine(guideColor.copy(alpha = 0.5f), Offset(10f*scale, 15f*scale), Offset(10f*scale + tick, 15f*scale), 1f*scale)
+            drawLine(guideColor.copy(alpha = 0.5f), Offset(15f*scale, 10f*scale), Offset(15f*scale, 10f*scale + tick), 1f*scale)
+            // Bottom-right draft corner ticks
+            drawLine(guideColor.copy(alpha = 0.5f), Offset(90f*scale, 85f*scale), Offset(90f*scale - tick, 85f*scale), 1f*scale)
+            drawLine(guideColor.copy(alpha = 0.5f), Offset(85f*scale, 90f*scale), Offset(85f*scale, 90f*scale - tick), 1f*scale)
+        }
+    }
+}
+
+@Composable
+fun BrandIdentityWorkspace(viewModel: QrViewModel) {
+    BrandIdentityWorkspaceRedesigned(viewModel)
+}
+
+@Composable
+fun BrandIdentityWorkspaceRedesigned(viewModel: QrViewModel) {
+    val context = LocalContext.current
+    var blueprintGuidesActive by remember { mutableStateOf(true) }
+    var selectedBrandColor by remember { mutableStateOf(Color(0xFFD8B4FE)) } // soft lavender default
+    
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp)
+    ) {
+        // Breadcrumb Navigation Back to Advanced Node
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.setTab("advanced") }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back arrow symbol",
+                    tint = Color(0xFFD8B4FE),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Back to Advanced Settings",
+                    color = Color(0xFFD8B4FE),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.1).sp
+                )
+            }
+        }
+
+        // Screen Header Title & Subtitle Segment
+        item {
+            Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+                Text(
+                    text = "Brand Assets",
+                    style = TextStyle(
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        fontSize = 26.sp,
+                        letterSpacing = (-0.8).sp
+                    )
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Manage logos, colors, typography and exports.",
+                    style = TextStyle(
+                        color = Color.Gray,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                )
+            }
+        }
+
+        // QUICK OVERVIEW - Equal Height Stat Grid
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val stats = listOf(
+                    Pair("Logo Variants", "8"),
+                    Pair("Color Palette", "4"),
+                    Pair("Typography", "2"),
+                    Pair("Export Assets", "16")
+                )
+                stats.forEach { stat ->
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(78.dp),
+                        colors = CardDefaults.cardColors(containerColor = SlateCard),
+                        border = BorderStroke(1.dp, SlateBorder),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = stat.second,
+                                color = Color(0xFFD8B4FE),
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.SansSerif
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stat.first,
+                                color = Color.Gray,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // CORE BRAND PRINCIPLES - 2-Column Grid
+        item {
+            Column {
+                Text(
+                    text = "Core design principles",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+                )
+                
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val principles = listOf(
+                        Pair("Precision", "Perfect alignment and grid systems"),
+                        Pair("Simplicity", "Minimal and memorable design"),
+                        Pair("Architecture", "Structured and modular layouts"),
+                        Pair("Intelligence", "Clear and intuitive experience"),
+                        Pair("Reliability", "Professional and trustworthy"),
+                        Pair("Innovation", "Modern and evolving specs")
+                    )
+                    for (i in principles.indices step 2) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (j in 0..1) {
+                                if (i + j < principles.size) {
+                                    val item = principles[i + j]
+                                    Card(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(72.dp),
+                                        colors = CardDefaults.cardColors(containerColor = SlateCard),
+                                        border = BorderStroke(1.dp, SlateBorder),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = item.first,
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = item.second,
+                                                color = Color.Gray,
+                                                fontSize = 11.sp,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // LOGO ASSETS - Horizontally Scrolling Section
+        item {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp, start = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Logo Assets",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Row(
+                        modifier = Modifier.clickable { blueprintGuidesActive = !blueprintGuidesActive },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(if (blueprintGuidesActive) Color(0xFFD8B4FE) else Color.DarkGray, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Drafting Guides",
+                            color = if (blueprintGuidesActive) Color.White else Color.Gray,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val logoVariants = listOf(
+                        Triple("App Icon", "App Launcher Asset", Color(0xFFD8B4FE)),
+                        Triple("Primary Logo", "Wordmark Identity", Color(0xFFD8B4FE)),
+                        Triple("Monochrome Logo", "Single-Ink Brandmark", Color.White),
+                        Triple("Light Mode Logo", "Light Canvas Target", Color(0xFF08080D))
+                    )
+                    
+                    logoVariants.forEach { item ->
+                        Card(
+                            modifier = Modifier
+                                .width(200.dp)
+                                .height(230.dp),
+                            colors = CardDefaults.cardColors(containerColor = SlateCard),
+                            border = BorderStroke(1.dp, SlateBorder),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                // Symbol Preview window Box
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(100.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (item.first == "Light Mode Logo") Color.White else Color(0xFF0D0E15))
+                                        .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (item.first == "Primary Logo") {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            QrArchitectSymbol(
+                                                modifier = Modifier.size(32.dp),
+                                                primaryColor = item.third,
+                                                showGuides = blueprintGuidesActive
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "QR ARCH",
+                                                color = item.third,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        }
+                                    } else {
+                                        QrArchitectSymbol(
+                                            modifier = Modifier.size(44.dp),
+                                            primaryColor = item.third,
+                                            showGuides = blueprintGuidesActive
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Information details
+                                Text(
+                                    text = item.first,
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = item.second,
+                                    color = Color.Gray,
+                                    fontSize = 10.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                
+                                // Chips
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    listOf("SVG", "PNG", "PDF").forEach { format ->
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color(0x0AFFFFFF), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(format, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                // Action Buttons
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            Toast.makeText(context, "Opened high-res ${item.first} viewer", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.weight(1f).height(28.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x0CFFFFFF), contentColor = Color.White),
+                                        contentPadding = PaddingValues(0.dp),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text("View", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Button(
+                                        onClick = {
+                                            Toast.makeText(context, "${item.first} format export queued!", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.weight(1f).height(28.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD8B4FE).copy(alpha = 0.12f), contentColor = Color(0xFFD8B4FE)),
+                                        contentPadding = PaddingValues(0.dp),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text("Export", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // COLOR PALETTE SECTION
+        item {
+            Column {
+                Text(
+                    text = "Color Palette",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                    border = BorderStroke(1.dp, SlateBorder),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            text = "Tap any color token to copy its HEX value scale:",
+                            color = Color.LightGray,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(bottom = 14.dp)
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val colors = listOf(
+                                Triple("Primary Lavender", Color(0xFFD8B4FE), "#D8B4FE"),
+                                Triple("Background", Color(0xFF08080D), "#08080D"),
+                                Triple("Surface", Color(0xFF11111B), "#11111B"),
+                                Triple("Secondary Purple", Color(0xFFC084FC), "#C084FC")
+                            )
+                            colors.forEach { item ->
+                                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            val clip = android.content.ClipData.newPlainText("Color Hex", item.third)
+                                            clipboardManager.setPrimaryClip(clip)
+                                            Toast.makeText(context, "${item.first} (${item.third}) copied!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(50.dp)
+                                            .clip(CircleShape)
+                                            .background(item.second)
+                                            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (item.first == "Primary Lavender") {
+                                            selectedBrandColor = item.second // let preview bind naturally
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = item.first,
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = item.third,
+                                        color = Color.Gray,
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // TYPOGRAPHY SPECIFICATIONS
+        item {
+            Column {
+                Text(
+                    text = "Typography",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                    border = BorderStroke(1.dp, SlateBorder),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Column {
+                                Text("Primary Font: Inter", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("Secondary Font: SF Pro Link", color = Color.Gray, fontSize = 11.sp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFD8B4FE).copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("TOKEN VALUE", color = Color(0xFFD8B4FE), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(14.dp))
+                        
+                        // Text specimen view box
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF080911), RoundedCornerShape(12.dp))
+                                .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(12.dp))
+                                .padding(18.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "QR Architect",
+                                    color = Color.White,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Aa Bb Cc 123",
+                                    color = Color(0xFFD8B4FE),
+                                    fontSize = 14.sp,
+                                    fontFamily = FontFamily.SansSerif,
+                                    letterSpacing = 1.5.sp
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(14.dp))
+                        
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "Font tokens: Inter Medium 14sp, SF Pro Bold 18sp active", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x0CFFFFFF), contentColor = Color.White),
+                            border = BorderStroke(1.dp, SlateBorder),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("View Tokens", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ASSET EXPORTS PACKAGES
+        item {
+            Column {
+                Text(
+                    text = "Asset Exports",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard),
+                    border = BorderStroke(1.dp, SlateBorder),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            text = "Download isolated individual variants or full assets archives:",
+                            color = Color.Gray,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("SVG", "PNG", "PDF", "ZIP Package").forEach { formatName ->
+                                Button(
+                                    onClick = {
+                                        Toast.makeText(context, "Exporting $formatName payload package", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x0AFFFFFF), contentColor = Color.White),
+                                    border = BorderStroke(1.dp, SlateBorder),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(formatName, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Main Corporate Kit Filled lavender style
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "Brand Kit bundle compilation completed (14.2 MB ZIP exported)!", Toast.LENGTH_LONG).show()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD8B4FE), // Filled lavender style
+                                contentColor = Color(0xFF08080D)
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = "Download folder package symbol",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Download Brand Kit",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BrandIdentityWorkspaceOld(viewModel: QrViewModel) {
+    val context = LocalContext.current
+    var blueprintGuidesActive by remember { mutableStateOf(true) }
+    var selectedBrandColor by remember { mutableStateOf(Color(0xFFD8B4FE)) } // soft lavender default
+    
+    val colorPalettes = listOf(
+        Pair("Lavender", Color(0xFFD8B4FE)),
+        Pair("Azure Slate", Color(0xFF38BDF8)),
+        Pair("Pure White", Color(0xFFFFFFFF)),
+        Pair("Coral Sunset", Color(0xFFFB7185)),
+        Pair("Emerald Tech", Color(0xFF34D399))
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp)
+    ) {
+        // SECTION 1: ELEGANT WORKSPACE PROLOGUE HEADER
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("brand_header_card"),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0x0CFFFFFF)).padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(6.dp).background(Color(0xFFD8B4FE), CircleShape))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "BRAND SPECIFICATION MANUAL",
+                            color = Color(0xFFD8B4FE),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "QR Architect™ Identity",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        letterSpacing = (-0.5).sp
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "The physical architecture of code. A premium visual system uniting dynamic connectivity blocks with structural engineering blueprints.",
+                        color = Color.Gray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Core Brand Values Bento Layout
+                    Text(
+                        text = "CORE BRAND VALUES",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        letterSpacing = 1.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val row1 = listOf(
+                            Pair("Precision", "Perfect grid spacing & alignments"),
+                            Pair("Simplicity", "Flat memorable vector geometry")
+                        )
+                        val row2 = listOf(
+                            Pair("Architecture", "Structured blueprint inspiration"),
+                            Pair("Intelligence", "Clean analytic core nodes")
+                        )
+                        val row3 = listOf(
+                            Pair("Reliability", "Symmetrical corporate trust balance"),
+                            Pair("Innovation", "Evolving code-block aesthetics")
+                        )
+
+                        listOf(row1, row2, row3).forEach { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                row.forEach { item ->
+                                    Card(
+                                        modifier = Modifier.weight(1f),
+                                        colors = CardDefaults.cardColors(containerColor = SlateDark.copy(alpha = 0.5f)),
+                                        border = BorderStroke(1.dp, SlateBorder)
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Text(
+                                                text = item.first,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                            Text(
+                                                text = item.second,
+                                                fontSize = 9.sp,
+                                                color = Color.Gray,
+                                                lineHeight = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 2: APP ICON DEVELOPMENT TOKEN SANDBOX (Requirement 1)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("app_icon_sandbox_card"),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "1. THE APP launch ICON SYMBOL",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Clean centered symbol without textual noise. Perfect geometric layout centered on a luxury workspace.",
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // The Interactive Icon Showcase Token
+                    Box(
+                        modifier = Modifier
+                            .size(160.dp)
+                            .align(Alignment.CenterHorizontally)
+                            .clip(RoundedCornerShape(32.dp)) // iOS / Android Icon Squircle corner
+                            .background(SlateDark)
+                            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(32.dp))
+                            .padding(24.dp)
+                    ) {
+                        QrArchitectSymbol(
+                            modifier = Modifier.fillMaxSize(),
+                            primaryColor = selectedBrandColor,
+                            showGuides = blueprintGuidesActive,
+                            guideColor = selectedBrandColor.copy(alpha = 0.35f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // CONTROL PANEL
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Blueprint Blueprint Guides",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Switch(
+                            checked = blueprintGuidesActive,
+                            onCheckedChange = { blueprintGuidesActive = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFFD8B4FE),
+                                checkedTrackColor = Color(0x33D8B4FE)
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "SWAP SPECIFICATION ACCENTS",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        letterSpacing = 1.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        colorPalettes.forEach { item ->
+                            val isChosen = selectedBrandColor == item.second
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isChosen) Color(0x1AFFFFFF) else Color.Transparent)
+                                    .border(BorderStroke(1.dp, if (isChosen) item.second else SlateBorder), RoundedCornerShape(8.dp))
+                                    .clickable { selectedBrandColor = item.second }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(modifier = Modifier.size(12.dp).background(item.second, CircleShape))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(text = item.first.substringBefore(" "), color = Color.White, fontSize = 8.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 3: MAIN TYPOGRAPHIC LOGO PRESENTATION (Requirement 2)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("main_logo_card"),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "2. MAIN CORPORATE LOGO",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Horizontal combination of the blueprint symbol with premium technical wordmark typography.",
+                        color = Color.Gray,
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // The Horizontal Typography Logo Core Representation
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SlateDark)
+                            .border(BorderStroke(1.dp, SlateBorder))
+                            .padding(vertical = 24.dp, horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            QrArchitectSymbol(
+                                modifier = Modifier.size(36.dp),
+                                primaryColor = selectedBrandColor,
+                                showGuides = blueprintGuidesActive
+                            )
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "QR",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = selectedBrandColor,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "ARCHITECT",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White,
+                                    letterSpacing = 4.sp // beautiful modern spacing like Linear/Stripe
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = {
+                            Toast.makeText(context, "Vector SVG Logo specifications copied to clipboard!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x0CFFFFFF), contentColor = Color.White),
+                        border = BorderStroke(1.dp, SlateBorder),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Path", modifier = Modifier.size(13.dp))
+                            Text("Copy Vector Asset specifications Schema", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 4: MONOCHROME VERSIONS (Requirement 3)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("monochrome_card"),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "3. SPECIFICATION MONOCHROME VERSIONS",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Flat monochrome vector values optimized for high contrast printing and architectural plotting.",
+                        color = Color.Gray,
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Monochrome LIGHT (Black Logo on White Background)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .border(BorderStroke(1.dp, Color.LightGray))
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "MONO LIGHT (SOLID BLACK)",
+                                color = Color.Gray,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            QrArchitectSymbol(
+                                modifier = Modifier.size(50.dp),
+                                primaryColor = Color.Black,
+                                showGuides = false
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Value: #000000",
+                                color = Color.DarkGray,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        // Monochrome DARK (White Logo on Solid Black Background)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF000000))
+                                .border(BorderStroke(1.dp, Color(0xFF1F1E2E)))
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "MONO DARK (SOLID WHITE)",
+                                color = Color.Gray,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            QrArchitectSymbol(
+                                modifier = Modifier.size(50.dp),
+                                primaryColor = Color.White,
+                                showGuides = false
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Value: #FFFFFF",
+                                color = Color.LightGray,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 5: DARK MODE vs LIGHT MODE THEME SAMPLES (Requirement 4 & 5)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("theme_previews_card"),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "4 & 5. CONTRAST THEME SAMPLES",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Dynamic comparisons displaying the logo inside full application mock frames.",
+                        color = Color.Gray,
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // DARK MODE SPEC SHEET (Lavender on Near-Black #08080D)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF08080D))
+                                .border(BorderStroke(1.dp, Color(0xFF161421)))
+                                .padding(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("SYSTEM: DARK MODE SPECIFIED", color = Color(0xFFD8B4FE), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0x11FFFFFF)).padding(horizontal = 4.dp, vertical = 2.dp)) {
+                                    Text("ACCENT #D8B4FE", color = Color.White, fontSize = 7.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                QrArchitectSymbol(modifier = Modifier.size(24.dp), primaryColor = Color(0xFFD8B4FE))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("QR ", color = Color(0xFFD8B4FE), fontSize = 14.sp, fontWeight = FontWeight.Black)
+                                Text("ARCHITECT", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                            }
+                        }
+
+                        // LIGHT MODE SPEC SHEET (Dark Indigo on Pure White #FFFFFF)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .border(BorderStroke(1.dp, Color(0xFFE2E8F0)))
+                                .padding(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("SYSTEM: LIGHT MODE SPECIFIED", color = Color(0xFF4F46E5), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0x0C000000)).padding(horizontal = 4.dp, vertical = 2.dp)) {
+                                    Text("ACCENT #4F46E5", color = Color.DarkGray, fontSize = 7.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                QrArchitectSymbol(modifier = Modifier.size(24.dp), primaryColor = Color(0xFF4F46E5))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("QR ", color = Color(0xFF4F46E5), fontSize = 14.sp, fontWeight = FontWeight.Black)
+                                Text("ARCHITECT", color = Color(0xFF1E293B), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // SECTION 6: RESPONSIVE LEGIBILITY & FAVICON WORK (Requirement 6)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("favicon_samples_card"),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                border = BorderStroke(1.dp, SlateBorder),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "6. SCALABILITY & FAVICON WORK",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "The geometry remains fully crisp and recognizable even when scaled down to a tiny 16×16 pixels favicon container.",
+                        color = Color.Gray,
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // THE BROWSER URL BAR MOCK (Shows Favicon in real-world use)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF181825))
+                            .border(BorderStroke(1.dp, SlateBorder))
+                    ) {
+                        // Browser top tab bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(26.dp)
+                                .background(Color(0xFF0F0F15))
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // Red, Yellow, Green browser window controls
+                            Box(modifier = Modifier.size(6.dp).background(Color(0xFFEF4444), CircleShape))
+                            Box(modifier = Modifier.size(6.dp).background(Color(0xFFF59E0B), CircleShape))
+                            Box(modifier = Modifier.size(6.dp).background(Color(0xFF10B981), CircleShape))
+                            
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Active simulated tab
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                    .background(Color(0xFF181825))
+                                    .height(22.dp)
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 16x16 MICRO FAVICON RENDERING
+                                QrArchitectSymbol(
+                                    modifier = Modifier.size(10.dp), // Tiny scaled rendering
+                                    primaryColor = Color(0xFFD8B4FE),
+                                    showGuides = false
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Console Hub - QR Architect",
+                                    color = Color.White,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        // Browser address URL input field
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(4.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF0F0F15))
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = "Secure", tint = Color(0xFF34D399), modifier = Modifier.size(8.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "https://qrarchitect.io/console/overview",
+                                color = Color.Gray,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // SIDE-BY-SIDE LEGIBILITY PREVIEWS
+                    Text(
+                        text = "CANONICAL RESOLUTION RENDER TEST",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        listOf(
+                            Pair("16×16 Favicon", 16),
+                            Pair("32×32 Widget", 32),
+                            Pair("64×64 Navigation", 64),
+                            Pair("128×128 Splash", 128)
+                        ).forEach { scaleSpec ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size((scaleSpec.second / 1.5).coerceIn(24.0, 72.0).dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SlateDark)
+                                        .border(BorderStroke(1.dp, SlateBorder))
+                                        .padding(4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    QrArchitectSymbol(
+                                        modifier = Modifier.fillMaxSize(0.7f),
+                                        primaryColor = selectedBrandColor,
+                                        showGuides = false
+                                    )
+                                }
+                                Text(
+                                    text = scaleSpec.first,
+                                    color = Color.LightGray,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StaggeredEntrance(
+    delayMs: Int,
+    baseTime: Int,
+    currentTime: Int,
+    content: @Composable () -> Unit
+) {
+    val targetActive = currentTime >= (baseTime + delayMs)
+    val alpha by animateFloatAsState(
+        targetValue = if (targetActive) 1f else 0f,
+        animationSpec = tween(500, easing = EaseOutCubic)
+    )
+    val offsetY by animateDpAsState(
+        targetValue = if (targetActive) 0.dp else 12.dp,
+        animationSpec = tween(500, easing = EaseOutCubic)
+    )
+    
+    Box(
+        modifier = Modifier
+            .graphicsLayer(alpha = alpha)
+            .offset(y = offsetY)
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun PremiumSplashScreenOverlay(
+    elapsedTime: Int,
+    isLibraryLoading: Boolean
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ambient")
+    val context = LocalContext.current
+    
+    // Ambient breathing/floating particle background
+    val radialGradientAlpha by animateFloatAsState(
+        targetValue = if (elapsedTime >= 200) 0.14f else 0f,
+        animationSpec = tween(800, easing = EaseInOutSine)
+    )
+    
+    val ambientDx by infiniteTransition.animateFloat(
+        initialValue = -40f,
+        targetValue = 40f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(6500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dx"
+    )
+    val ambientDy by infiniteTransition.animateFloat(
+        initialValue = -30f,
+        targetValue = 30f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dy"
+    )
+    
+    val particles = remember {
+        List(14) {
+            FloatingParticle(
+                xPercent = kotlin.random.Random.nextFloat(),
+                yPercent = kotlin.random.Random.nextFloat(),
+                size = kotlin.random.Random.nextFloat() * 3f + 1.5f,
+                speed = kotlin.random.Random.nextFloat() * 0.04f + 0.015f
+            )
+        }
+    }
+    
+    val particleTransitionVal by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "particles"
+    )
+
+    // Phases
+    val phase2Scale by animateFloatAsState(
+        targetValue = if (elapsedTime >= 400) 1.0f else 0.85f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
+    )
+    val phase2Opacity by animateFloatAsState(
+        targetValue = if (elapsedTime >= 400) 1.0f else 0f,
+        animationSpec = tween(650, easing = EaseInOutCubic)
+    )
+
+    // Staggered Title and Subtitle text offsets
+    val textStagger1 by animateFloatAsState(
+        targetValue = if (elapsedTime >= 1000) 1.0f else 0f,
+        animationSpec = tween(600, easing = EaseOutCubic)
+    )
+    val textStagger2 by animateFloatAsState(
+        targetValue = if (elapsedTime >= 1200) 1.0f else 0f,
+        animationSpec = tween(600, easing = EaseOutCubic)
+    )
+
+    // Phase 5 Morph transition
+    val morphProgress by animateFloatAsState(
+        targetValue = if (elapsedTime >= 2200) 1.0f else 0f,
+        animationSpec = tween(400, easing = CubicBezierEasing(0.25f, 1f, 0.5f, 1f))
+    )
+
+    // Background overlay alpha (Fades out the dark screen to reveal the library)
+    val bgAlpha = 1f - morphProgress
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer(alpha = bgAlpha)
+            .background(Color(0xFF08080D))
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+    ) {
+        val width = maxWidth
+        val height = maxHeight
+
+        // Render ambient effects on canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // Breathing radial glow
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFD8B4FE).copy(alpha = radialGradientAlpha), Color.Transparent),
+                    center = Offset(size.width / 2f + ambientDx * density, size.height / 2f + ambientDy * density),
+                    radius = size.width * 0.75f
+                )
+            )
+
+            // Dynamic float-up particles
+            particles.forEach { particle ->
+                val yPos = ((particle.yPercent * size.height) - (particleTransitionVal * particle.speed * 8f)) % size.height
+                val finalY = if (yPos < 0f) yPos + size.height else yPos
+                drawCircle(
+                    color = Color(0xFFD8B4FE).copy(alpha = 0.08f),
+                    radius = particle.size,
+                    center = Offset(particle.xPercent * size.width, finalY)
+                )
+            }
+        }
+
+        // Shared Element Geometry Flight calculations
+        val targetSize = 48.dp
+        val startSize = 100.dp
+        val currentSize = lerp(startSize, targetSize, morphProgress)
+        val currentCorner = lerp(32.dp, 14.dp, morphProgress)
+
+        // Center position vs Header position (interpolated)
+        val startX = width / 2f - startSize / 2f
+        val startY = height / 2f - startSize / 2f - 60.dp
+        
+        // Final position of the header icon on-screen
+        val targetX = 20.dp
+        val targetY = 12.dp
+
+        val currentX = lerp(startX, targetX, morphProgress)
+        val currentY = lerp(startY, targetY, morphProgress)
+
+        // Title and Subtitle alpha fades as morph starts
+        val titleAlpha = textStagger1 * (1f - morphProgress)
+        val subtitleAlpha = textStagger2 * (1f - morphProgress)
+
+        // Sequential mini QR pattern pieces around center (Phase 4)
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = (-60).dp)
+                .size(100.dp)
+        ) {
+            val qrBlocks = listOf(
+                Offset(-18f, -18f),
+                Offset(106f, -18f),
+                Offset(-18f, 106f),
+                Offset(106f, 106f),
+                Offset(44f, -18f),
+                Offset(-18f, 44f)
+            )
+            qrBlocks.forEachIndexed { idx, offset ->
+                val blockAlpha by animateFloatAsState(
+                    targetValue = if (elapsedTime >= (1600 + idx * 90)) 0.75f else 0f,
+                    animationSpec = tween(400, easing = EaseInOutSine)
+                )
+                Box(
+                    modifier = Modifier
+                        .offset(x = offset.x.dp, y = offset.y.dp)
+                        .size(11.dp)
+                        .graphicsLayer(alpha = blockAlpha * (1f - morphProgress))
+                        .background(Color(0xFFD8B4FE), RoundedCornerShape(3.dp))
+                )
+            }
+        }
+
+        // Animated Logo Box
+        Box(
+            modifier = Modifier
+                .offset(x = currentX, y = currentY)
+                .size(currentSize)
+                .graphicsLayer(
+                    scaleX = phase2Scale,
+                    scaleY = phase2Scale,
+                    alpha = phase2Opacity
+                )
+                .clip(RoundedCornerShape(currentCorner))
+                .background(
+                    if (morphProgress < 0.05f) {
+                        Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                    } else {
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFFD8B4FE).copy(alpha = morphProgress),
+                                Color(0xFFC084FC).copy(alpha = morphProgress)
+                            )
+                        )
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            QrArchitectSymbol(
+                modifier = Modifier.fillMaxSize(0.6f + (0.05f * (1f - morphProgress))),
+                primaryColor = Color(
+                    red = lerp(0xD8 / 255f, 0x08 / 255f, morphProgress),
+                    green = lerp(0xB4 / 255f, 0x08 / 255f, morphProgress),
+                    blue = lerp(0xFE / 255f, 0x0D / 255f, morphProgress)
+                ),
+                showGuides = false
+            )
+        }
+
+        // Title text and Subtitle column below the center Logo
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = 65.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = "QR Architect",
+                color = Color.White,
+                fontSize = 32.sp,
+                style = TextStyle(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.SansSerif,
+                    letterSpacing = (-0.5).sp
+                ),
+                modifier = Modifier
+                    .graphicsLayer(
+                        alpha = titleAlpha,
+                        translationY = lerp(8f, 0f, textStagger1)
+                    )
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Manage your dynamic codes",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                style = TextStyle(
+                    fontFamily = FontFamily.SansSerif,
+                    letterSpacing = 0.1.sp
+                ),
+                modifier = Modifier
+                    .graphicsLayer(
+                        alpha = subtitleAlpha,
+                        translationY = lerp(8f, 0f, textStagger2)
+                    )
+            )
+
+            // Extra Loading Section if database initialization takes longer than standard progress (Phase 5 wait)
+            val isLoadingVisible = elapsedTime >= 2200 && isLibraryLoading
+            val loadingAlpha by animateFloatAsState(
+                targetValue = if (isLoadingVisible) 1.0f else 0f,
+                animationSpec = tween(400, easing = EaseInOut)
+            )
+
+            if (loadingAlpha > 0f) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .padding(top = 32.dp)
+                        .graphicsLayer(alpha = loadingAlpha)
+                ) {
+                    Text(
+                        text = "Preparing your workspace...",
+                        color = Color(0xFFD8B4FE).copy(alpha = 0.75f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.4.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    PulsingDots()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PulsingDots() {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse_dots")
+    val dotCount = 3
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        for (i in 0 until dotCount) {
+            val pulseDelay = i * 250
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 0.5f,
+                targetValue = 1.0f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(600, delayMillis = pulseDelay, easing = EaseInOutSine),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "dot_$i"
+            )
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 0.9f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(600, delayMillis = pulseDelay, easing = EaseInOutSine),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "alpha_$i"
+            )
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .graphicsLayer(scaleX = scale, scaleY = scale, alpha = alpha)
+                    .background(Color(0xFFD8B4FE), CircleShape)
+            )
+        }
+    }
+}
+
+class FloatingParticle(val xPercent: Float, val yPercent: Float, val size: Float, val speed: Float)
+
+private fun lerp(start: Float, stop: Float, fraction: Float): Float =
+    start + fraction * (stop - start)
+
+

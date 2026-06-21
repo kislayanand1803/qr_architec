@@ -1,30 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    
+    <!-- Outer Finder Square Frame (Hollow rounded square outline) -->
     <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+        android:fillColor="#00000000"
+        android:strokeColor="#D8B4FE"
+        android:strokeWidth="3.36"
+        android:strokeLineCap="round"
+        android:pathData="M 38.88,34.4 L 48.96,34.4 A 4.48,4.48 0 0 1 53.44,38.88 L 53.44,48.96 A 4.48,4.48 0 0 1 48.96,53.44 L 38.88,53.44 A 4.48,4.48 0 0 1 34.4,48.96 L 34.4,38.88 A 4.48,4.48 0 0 1 38.88,34.4 Z" />
+    
+    <!-- Inner Solid Square of the Finder Block -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 41.68,40.0 H 46.16 A 1.68,1.68 0 0 1 47.84,41.68 V 46.16 A 1.68,1.68 0 0 1 46.16,47.84 H 41.68 A 1.68,1.68 0 0 1 40.0,46.16 V 41.68 A 1.68,1.68 0 0 1 41.68,40.0 Z" />
+        
+    <!-- Top-Right Long Beam -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 59.88,34.4 H 71.64 A 1.96,1.96 0 0 1 73.6,36.36 V 36.92 A 1.96,1.96 0 0 1 71.64,38.88 H 59.88 A 1.96,1.96 0 0 1 57.92,36.92 V 36.36 A 1.96,1.96 0 0 1 59.88,34.4 Z" />
+        
+    <!-- Top-Right Short Beam -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 59.88,41.12 H 66.04 A 1.96,1.96 0 0 1 68.0,43.08 V 43.64 A 1.96,1.96 0 0 1 66.04,45.6 H 59.88 A 1.96,1.96 0 0 1 57.92,43.64 V 43.08 A 1.96,1.96 0 0 1 59.88,41.12 Z" />
+        
+    <!-- Top-Right Beacon Node -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 71.64,41.12 H 72.2 A 1.4,1.4 0 0 1 73.6,42.52 V 44.2 A 1.4,1.4 0 0 1 72.2,45.6 H 71.64 A 1.4,1.4 0 0 1 70.24,44.2 V 42.52 A 1.4,1.4 0 0 1 71.64,41.12 Z" />
+        
+    <!-- Bottom-Left Long Vertical Column -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 36.36,57.92 H 36.92 A 1.96,1.96 0 0 1 38.88,59.88 V 71.64 a 1.96,1.96 0 0 1 -1.96,1.96 H 36.36 A 1.96,1.96 0 0 1 34.4,71.64 V 59.88 A 1.96,1.96 0 0 1 36.36,57.92 Z" />
+        
+    <!-- Bottom-Left Short Column -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 43.08,57.92 H 43.64 A 1.96,1.96 0 0 1 45.6,59.88 V 66.04 a 1.96,1.96 0 0 1 -1.96,1.96 H 43.08 A 1.96,1.96 0 0 1 41.12,66.04 V 59.88 A 1.96,1.96 0 0 1 43.08,57.92 Z" />
+        
+    <!-- Bottom-Left Lower Anchor Block -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 42.52,70.24 H 44.2 A 1.4,1.4 0 0 1 45.6,71.64 V 72.2 A 1.4,1.4 0 0 1 44.2,73.6 H 42.52 A 1.4,1.4 0 0 1 41.12,72.2 V 71.64 A 1.4,1.4 0 0 1 42.52,70.24 Z" />
+        
+    <!-- Bottom-Right Square 1 (Solid Top-Left) -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 59.6,57.92 H 62.4 A 1.68,1.68 0 0 1 64.08,59.6 V 62.4 A 1.68,1.68 0 0 1 62.4,64.08 H 59.6 A 1.68,1.68 0 0 1 57.92,62.4 V 59.6 A 1.68,1.68 0 0 1 59.6,57.92 Z" />
+        
+    <!-- Bottom-Right Square 2 (Hollow Top-Right) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#D8B4FE"
+        android:strokeWidth="1.96"
+        android:pathData="M 68.56,57.92 H 71.36 A 1.68,1.68 0 0 1 73.04,59.6 V 62.4 A 1.68,1.68 0 0 1 71.36,64.08 H 68.56 A 1.68,1.68 0 0 1 66.88,62.4 V 59.6 A 1.68,1.68 0 0 1 68.56,57.92 Z" />
+        
+    <!-- Bottom-Right Square 3 (Hollow Bottom-Left) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#D8B4FE"
+        android:strokeWidth="1.96"
+        android:pathData="M 59.6,66.88 H 62.4 A 1.68,1.68 0 0 1 64.08,68.56 V 71.36 A 1.68,1.68 0 0 1 62.4,73.04 H 59.6 A 1.68,1.68 0 0 1 57.92,71.36 V 68.56 A 1.68,1.68 0 0 1 59.6,66.88 Z" />
+        
+    <!-- Bottom-Right Square 4 (Solid Bottom-Right with blueprint crossover) -->
+    <path
+        android:fillColor="#D8B4FE"
+        android:pathData="M 68.56,66.88 H 71.36 A 1.68,1.68 0 0 1 73.04,68.56 V 71.36 A 1.68,1.68 0 0 1 71.36,73.04 H 68.56 A 1.68,1.68 0 0 1 66.88,71.36 V 68.56 A 1.68,1.68 0 0 1 68.56,66.88 Z" />
+        
 </vector>
