@@ -9,6 +9,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -43,10 +44,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -226,8 +230,20 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
                         enter = fadeIn() + scaleIn(),
                         exit = fadeOut() + scaleOut()
                     ) {
+                        val fabInteractionSource = remember { MutableInteractionSource() }
+                        val isFabPressed by fabInteractionSource.collectIsPressedAsState()
+                        val fabScale by animateFloatAsState(
+                            targetValue = if (isFabPressed) 0.97f else 1.0f,
+                            animationSpec = if (isFabPressed) {
+                                tween(durationMillis = 100, easing = LinearOutSlowInEasing)
+                            } else {
+                                spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
+                            }
+                        )
+
                         FloatingActionButton(
                             onClick = { viewModel.setTab("creator") },
+                            interactionSource = fabInteractionSource,
                             containerColor = Color(0xFFD8B4FE), // Lavender
                             contentColor = Color(0xFF08080D), // Contrast deep SlateDark
                             shape = RoundedCornerShape(20.dp),
@@ -240,6 +256,10 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
                             modifier = Modifier
                                 .size(60.dp)
                                 .padding(bottom = 4.dp, end = 4.dp)
+                                .graphicsLayer {
+                                    scaleX = fabScale
+                                    scaleY = fabScale
+                                }
                                 .testTag("create_qr_fab")
                         ) {
                             Icon(
@@ -268,7 +288,11 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
                         .padding(horizontal = 16.dp)
                 ) {
                     // Main Branded Navbar
-                    if (viewModel.currentTab != "library") {
+                    AnimatedVisibility(
+                        visible = viewModel.currentTab != "library",
+                        enter = fadeIn(animationSpec = tween(durationMillis = 250)) + expandVertically(animationSpec = tween(durationMillis = 250)),
+                        exit = fadeOut(animationSpec = tween(durationMillis = 220)) + shrinkVertically(animationSpec = tween(durationMillis = 220))
+                    ) {
                         BrandedHeader(
                             onResetDemo = {
                                 Toast.makeText(context, "Demo presets restored in background database", Toast.LENGTH_SHORT).show()
@@ -431,6 +455,19 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
                         Spacer(modifier = Modifier.height(12.dp))
 
                         if (showWhatsNewDialog) {
+                            var dialogAnimateTrigger by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) {
+                                dialogAnimateTrigger = true
+                            }
+                            val dialogScale by animateFloatAsState(
+                                targetValue = if (dialogAnimateTrigger) 1.0f else 0.95f,
+                                animationSpec = tween(durationMillis = 180, easing = EaseOutCubic)
+                            )
+                            val dialogAlpha by animateFloatAsState(
+                                targetValue = if (dialogAnimateTrigger) 1.0f else 0.0f,
+                                animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing)
+                            )
+
                             AlertDialog(
                                 onDismissRequest = { showWhatsNewDialog = false },
                                 containerColor = SlateCard,
@@ -463,7 +500,13 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
                                     }
                                 },
                                 shape = RoundedCornerShape(18.dp),
-                                modifier = Modifier.border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(18.dp))
+                                modifier = Modifier
+                                    .graphicsLayer {
+                                        scaleX = dialogScale
+                                        scaleY = dialogScale
+                                        alpha = dialogAlpha
+                                    }
+                                    .border(BorderStroke(1.dp, SlateBorder), RoundedCornerShape(18.dp))
                             )
                         }
                     }
@@ -488,32 +531,67 @@ fun QrAppMain(viewModel: QrViewModel = viewModel()) {
                         Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    // Render respective tab workspace
-                    when (viewModel.currentTab) {
-                        "library" -> LibraryWorkspace(
-                            qrList = qrList,
-                            viewModel = viewModel,
-                            onQrSelected = { activeDetailQr = it },
-                            elapsedTime = elapsedTime
-                        )
-                        "creator" -> CreatorWorkshopWorkspace(
-                            viewModel = viewModel,
-                            onSaveClicked = {
-                                viewModel.saveQrRepresentation()
-                                Toast.makeText(context, "Successfully saved custom QR Architect!", Toast.LENGTH_SHORT).show()
+                    // Render respective tab workspace with smooth, premium transitions
+                    AnimatedContent(
+                        targetState = viewModel.currentTab,
+                        transitionSpec = {
+                            val tabsList = listOf("library", "creator", "analytics", "advanced", "brand")
+                            val fromIndex = tabsList.indexOf(initialState).coerceAtLeast(0)
+                            val toIndex = tabsList.indexOf(targetState).coerceAtLeast(0)
+                            val isForward = toIndex >= fromIndex
+
+                            if (isForward) {
+                                // Forward Navigation
+                                val enterTransition = slideInHorizontally(
+                                    animationSpec = tween(durationMillis = 250, easing = CubicBezierEasing(0.25f, 1.0f, 0.5f, 1.0f))
+                                ) { 40 } + fadeIn(animationSpec = tween(durationMillis = 250))
+
+                                val exitTransition = slideOutHorizontally(
+                                    animationSpec = tween(durationMillis = 250, easing = CubicBezierEasing(0.25f, 1.0f, 0.5f, 1.0f))
+                                ) { -40 } + fadeOut(animationSpec = tween(durationMillis = 250), targetAlpha = 0.9f)
+
+                                enterTransition togetherWith exitTransition
+                            } else {
+                                // Back Navigation
+                                val enterTransition = slideInHorizontally(
+                                    animationSpec = tween(durationMillis = 220, easing = CubicBezierEasing(0.25f, 1.0f, 0.5f, 1.0f))
+                                ) { -40 } + fadeIn(animationSpec = tween(durationMillis = 220), initialAlpha = 0.9f)
+
+                                val exitTransition = slideOutHorizontally(
+                                    animationSpec = tween(durationMillis = 220, easing = CubicBezierEasing(0.25f, 1.0f, 0.5f, 1.0f))
+                                ) { 40 } + fadeOut(animationSpec = tween(durationMillis = 220))
+
+                                enterTransition togetherWith exitTransition
                             }
-                        )
-                        "brand" -> BrandIdentityWorkspace(
-                            viewModel = viewModel
-                        )
-                        "analytics" -> CampaignAnalyticsWorkspace(
-                            qrList = qrList,
-                            scanLogs = scanLogs,
-                            viewModel = viewModel
-                        )
-                        "advanced" -> AdvancedSettingsWorkspace(
-                            viewModel = viewModel
-                        )
+                        },
+                        label = "ScreenTransitions"
+                    ) { targetTab ->
+                        when (targetTab) {
+                            "library" -> LibraryWorkspace(
+                                qrList = qrList,
+                                viewModel = viewModel,
+                                onQrSelected = { qr -> viewModel.loadForEditing(qr) },
+                                elapsedTime = elapsedTime
+                            )
+                            "creator" -> CreatorWorkshopWorkspace(
+                                viewModel = viewModel,
+                                onSaveClicked = {
+                                    viewModel.saveQrRepresentation()
+                                    Toast.makeText(context, "Successfully saved custom QR Architect!", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                            "brand" -> BrandIdentityWorkspace(
+                                viewModel = viewModel
+                            )
+                            "analytics" -> CampaignAnalyticsWorkspace(
+                                qrList = qrList,
+                                scanLogs = scanLogs,
+                                viewModel = viewModel
+                            )
+                            "advanced" -> AdvancedSettingsWorkspace(
+                                viewModel = viewModel
+                            )
+                        }
                     }
                 }
 
@@ -2143,6 +2221,37 @@ fun CreatorWorkshopWorkspace(
         previewAndroidBitmap.asImageBitmap()
     }
 
+    var isEntering by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        isEntering = false
+    }
+
+    val previewScale by animateFloatAsState(
+        targetValue = if (isEntering) 0.98f else 1.0f,
+        animationSpec = tween(durationMillis = 300, easing = CubicBezierEasing(0.25f, 1.0f, 0.5f, 1.0f))
+    )
+
+    val previewOpacity by animateFloatAsState(
+        targetValue = if (isEntering) 0.0f else 1.0f,
+        animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing)
+    )
+
+    var controlsVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(300) // Delay editing controls display until transition is complete
+        controlsVisible = true
+    }
+
+    val controlsAlpha by animateFloatAsState(
+        targetValue = if (controlsVisible) 1.0f else 0.0f,
+        animationSpec = tween(durationMillis = 250, easing = EaseOutCubic)
+    )
+
+    val controlsOffsetY by animateDpAsState(
+        targetValue = if (controlsVisible) 0.dp else 12.dp,
+        animationSpec = tween(durationMillis = 250, easing = EaseOutCubic)
+    )
+
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
         // ---------------- STICKY PREVIEW & ACTION PANEL ----------------
         Card(
@@ -2151,6 +2260,11 @@ fun CreatorWorkshopWorkspace(
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
                 .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = previewScale
+                    scaleY = previewScale
+                    alpha = previewOpacity
+                }
                 .padding(bottom = 12.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -2362,6 +2476,10 @@ fun CreatorWorkshopWorkspace(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
+                .graphicsLayer {
+                    alpha = controlsAlpha
+                    translationY = controlsOffsetY.toPx()
+                }
                 .verticalScroll(rememberScrollState())
         ) {
             // General Info Header
@@ -4900,57 +5018,157 @@ fun QrBottomNavigation(
     activeTab: String,
     onTabSelected: (String) -> Unit
 ) {
-    NavigationBar(
-        containerColor = SlateCard,
+    val items = listOf(
+        Pair("library", Triple("Library", Icons.Default.LibraryBooks, Icons.Default.LibraryBooks)),
+        Pair("creator", Triple("Creator", Icons.Default.ColorLens, Icons.Default.ColorLens)),
+        Pair("analytics", Triple("Analytics", Icons.Default.Leaderboard, Icons.Default.Leaderboard)),
+        Pair("advanced", Triple("Advanced", Icons.Default.AutoAwesome, Icons.Default.AutoAwesome))
+    )
+
+    val activeIndex = items.indexOfFirst {
+        activeTab == it.first || (it.first == "advanced" && activeTab == "brand")
+    }.coerceAtLeast(0)
+
+    var tabContentWidths by remember { mutableStateOf(mapOf<Int, Int>()) }
+
+    BoxWithConstraints(
         modifier = Modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .height(82.dp) // Generous height for premium spacing
-            .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-                clip = false
-            )
+            .fillMaxWidth()
+            .height(78.dp)
+            .background(Color(0xFF0D0D14), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .border(
-                border = BorderStroke(1.dp, SlateBorder),
-                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
-            ),
-        tonalElevation = 0.dp // Keeps SlateCard pure dark without unwanted light elevation tint
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            )
     ) {
-        val items = listOf(
-            Pair("library", Triple("Library", Icons.Default.LibraryBooks, Icons.Default.LibraryBooks)),
-            Pair("creator", Triple("Creator", Icons.Default.ColorLens, Icons.Default.ColorLens)),
-            Pair("analytics", Triple("Analytics", Icons.Default.Leaderboard, Icons.Default.Leaderboard)),
-            Pair("advanced", Triple("Advanced", Icons.Default.AutoAwesome, Icons.Default.AutoAwesome))
+        val density = LocalDensity.current
+        val activeContentWidthPx = tabContentWidths[activeIndex] ?: 0
+        val activeContentWidthDp = if (activeContentWidthPx == 0) 64.dp else with(density) { activeContentWidthPx.toDp() }
+
+        // Width dynamically adapts to icon + label with 18dp padding on each side (36dp total), minimum 72dp
+        val targetPillWidth = (activeContentWidthDp + 36.dp).coerceAtLeast(72.dp)
+        val animatedPillWidth by animateDpAsState(
+            targetValue = targetPillWidth,
+            animationSpec = tween(durationMillis = 220, easing = EaseOutCubic),
+            label = "PillWidth"
         )
 
-        items.forEach { item ->
-            val isSelected = activeTab == item.first || (item.first == "advanced" && activeTab == "brand")
-            NavigationBarItem(
-                selected = isSelected,
-                onClick = { onTabSelected(item.first) },
-                icon = {
-                    Icon(
-                        imageVector = if (isSelected) item.second.second else item.second.third,
-                        contentDescription = item.second.first,
-                        modifier = Modifier.size(28.dp) // Large premium icon size (increased to 28dp)
-                    )
-                },
-                label = {
-                    Text(
-                        text = item.second.first,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 12.sp,
-                        letterSpacing = 0.2.sp
-                    )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = Color(0xFFD8B4FE), // Lavender pill background
-                    selectedIconColor = SlateDark, // Dark contrast color for selected icon
-                    unselectedIconColor = Color(0xFF94A3B8), // Brighter unselected icon
-                    selectedTextColor = Color.White, // Brighter white text for active tab
-                    unselectedTextColor = Color(0xFF64748B) // Soft gray text for inactive tabs
+        val usableWidth = maxWidth - 32.dp
+        val itemWidth = usableWidth / items.size
+        val targetCenter = 16.dp + itemWidth * activeIndex + (itemWidth / 2)
+        val animatedCenter by animateDpAsState(
+            targetValue = targetCenter,
+            animationSpec = tween(durationMillis = 220, easing = EaseOutCubic),
+            label = "PillCenter"
+        )
+
+        val pillLeft = animatedCenter - (animatedPillWidth / 2)
+
+        // 1. Sliding indicator pill behind the items with premium 10% opacity, 12dp blur shadow
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = pillLeft)
+                .shadow(
+                    elevation = 12.dp,
+                    shape = RoundedCornerShape(999.dp),
+                    clip = false,
+                    ambientColor = Color.Black.copy(alpha = 0.10f),
+                    spotColor = Color.Black.copy(alpha = 0.10f)
                 )
-            )
+                .size(width = animatedPillWidth, height = 42.dp)
+                .background(Color(0xFFD8B4FE), RoundedCornerShape(999.dp))
+        )
+
+        // 2. Navigation Elements in Row to align content perfectly
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEachIndexed { idx, item ->
+                val isSelected = idx == activeIndex
+
+                // Subtle icon scale on selection: 1.0 -> 1.05 -> 1.0 (no bounce, 150ms)
+                val iconScale by animateFloatAsState(
+                    targetValue = 1.0f,
+                    animationSpec = if (isSelected) {
+                        keyframes {
+                            durationMillis = 150
+                            1.0f at 0 with LinearEasing
+                            1.05f at 75 with FastOutSlowInEasing
+                            1.0f at 150 with FastOutSlowInEasing
+                        }
+                    } else {
+                        tween(durationMillis = 150)
+                    },
+                    label = "IconScale"
+                )
+
+                // Smooth color animations
+                val textColor by animateColorAsState(
+                    targetValue = if (isSelected) SlateDark else Color.White.copy(alpha = 0.6f),
+                    animationSpec = tween(durationMillis = 220, easing = EaseOutCubic),
+                    label = "TextColor"
+                )
+
+                val iconColor by animateColorAsState(
+                    targetValue = if (isSelected) SlateDark else Color.White.copy(alpha = 0.6f),
+                    animationSpec = tween(durationMillis = 220, easing = EaseOutCubic),
+                    label = "IconColor"
+                )
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            onTabSelected(item.first)
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .onSizeChanged { size ->
+                                tabContentWidths = tabContentWidths + (idx to size.width)
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isSelected) item.second.second else item.second.third,
+                            contentDescription = item.second.first,
+                            tint = iconColor,
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                }
+                                .size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = item.second.first,
+                            fontWeight = FontWeight.Medium,
+                            color = textColor,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            letterSpacing = 0.2.sp,
+                            style = TextStyle(
+                                platformStyle = PlatformTextStyle(
+                                    includeFontPadding = false
+                                )
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }
